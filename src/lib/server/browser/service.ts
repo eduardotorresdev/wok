@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import Database from 'better-sqlite3';
 import { chromium, devices, type BrowserContext, type CDPSession, type Page } from 'playwright';
+import { sqlite } from '../db/index.ts';
 import { config } from '../env.ts';
 import { ApiError } from '../http.ts';
 import { userDir } from '../latex.ts';
@@ -35,6 +36,10 @@ export interface BrowserState {
 	 * offer: the person applies there by themselves.
 	 */
 	glassdoorManual: boolean;
+	/** The page is still being opened (the browser may be starting); frames follow on the stream. */
+	loading: boolean;
+	/** Why the last attempt to open a page failed, in Portuguese; null when it did not. */
+	loadError: string | null;
 }
 
 export interface Frame {
@@ -71,6 +76,7 @@ interface Tab {
 	cdp: CDPSession | null;
 	lastFrame: Frame | null;
 	controller: Controller;
+	loadError: string | null;
 }
 
 interface Session {
@@ -241,6 +247,45 @@ async function detectAccounts(session: Session): Promise<Accounts> {
 	return accounts;
 }
 
+// ---------------------------------------------------------------- activity registry
+
+// A deploy restarts the server and with it every browser. Applications in
+// progress are visible in the database; a person in the middle of a login in
+// "connect accounts" was not. This table says who is using the browser now, so
+// the deploy script can wait: a row is "active" when last_activity is recent.
+
+const TOUCH_EVERY_MS = 15_000;
+const lastTouch = new Map<string, number>();
+
+function noteUserActivity(userId: string, force = false) {
+	const now = Date.now();
+	if (!force && now - (lastTouch.get(userId) ?? 0) < TOUCH_EVERY_MS) return;
+	lastTouch.set(userId, now);
+	try {
+		sqlite()
+			.prepare(
+				'insert into browser_user_session (user_id, last_activity) values (?, ?) on conflict (user_id) do update set last_activity = excluded.last_activity'
+			)
+			.run(userId, now);
+	} catch (err) {
+		console.error('[browser] could not record activity', err);
+	}
+}
+
+function forgetUserActivity(userId: string) {
+	lastTouch.delete(userId);
+	try {
+		sqlite().prepare('delete from browser_user_session where user_id = ?').run(userId);
+	} catch {
+		// the row ages out by itself
+	}
+}
+
+/** No browser survives a restart, so neither does the record of who was using one. */
+export function resetUserActivity() {
+	sqlite().prepare('delete from browser_user_session').run();
+}
+
 // ---------------------------------------------------------------- session lifecycle
 
 /** Which tab a request without applicationId means: accounts tab, else the one the agent drives. */
@@ -269,6 +314,8 @@ async function tabState(session: Session, tab: Tab): Promise<BrowserState> {
 		url: tab.page.url(),
 		title: await tab.page.title().catch(() => null),
 		viewport: VIEWPORT,
+		loading: loading.has(`${session.userId}:${tab.key}`),
+		loadError: tab.loadError,
 		...shownAccounts(await detectAccounts(session))
 	};
 }
@@ -281,7 +328,25 @@ function closedState(userId: string, applicationId?: string | null): BrowserStat
 		url: null,
 		title: null,
 		viewport: VIEWPORT,
+		loading: false,
+		loadError: null,
 		...shownAccounts(readAccounts(userId))
+	};
+}
+
+/**
+ * Tabs being opened in the background (the browser may still be starting):
+ * `userId:tabKey` → the address they are going to.
+ */
+const loading = new Map<string, string>();
+
+function loadingState(userId: string, applicationId: string | null, url: string): BrowserState {
+	return {
+		...closedState(userId, applicationId),
+		open: true,
+		controller: 'user',
+		url,
+		loading: true
 	};
 }
 
@@ -293,6 +358,8 @@ export async function getState(
 	const session = sessions.get(userId);
 	const tab = resolveTab(session, applicationId);
 	if (!session || !tab) {
+		const going = loading.get(`${userId}:${applicationId ?? USER_TAB}`);
+		if (going) return loadingState(userId, applicationId ?? null, going);
 		const closed = closedState(userId, applicationId);
 		if (session) Object.assign(closed, shownAccounts(await detectAccounts(session)));
 		return closed;
@@ -358,7 +425,15 @@ async function openTab(session: Session, key: string): Promise<Tab> {
 	const used = new Set([...session.tabs.values()].flatMap((t) => t.stack));
 	const spare = session.context.pages().find((p) => !p.isClosed() && !used.has(p));
 	const page = spare ?? (await session.context.newPage());
-	const tab: Tab = { key, page, stack: [page], cdp: null, lastFrame: null, controller: 'idle' };
+	const tab: Tab = {
+		key,
+		page,
+		stack: [page],
+		cdp: null,
+		lastFrame: null,
+		controller: 'idle',
+		loadError: null
+	};
 	session.tabs.set(key, tab);
 	watchPage(session, tab, page);
 	await attachScreencast(session, tab, page);
@@ -408,6 +483,11 @@ async function launch(userId: string): Promise<Session> {
 		lastActivity: Date.now(),
 		idleTimer: setInterval(() => {
 			const tabs = [...session.tabs.values()];
+			// Someone watching a tab they control is in the middle of something (a login,
+			// a verification), even while reading a code on the phone and typing nothing.
+			if (viewers.get(userId) && tabs.some((t) => t.controller === 'user')) {
+				noteUserActivity(userId);
+			}
 			if (tabs.some((t) => t.controller === 'agent') || viewers.get(userId)) return;
 			const paused = tabs.some((t) => t.key !== USER_TAB);
 			const limit = paused ? IDLE_CLOSE_PAUSED_MS : IDLE_CLOSE_MS;
@@ -448,7 +528,15 @@ async function ensure(userId: string): Promise<Session> {
 	}
 	let pending = opening.get(userId);
 	if (!pending) {
-		pending = launch(userId).finally(() => opening.delete(userId));
+		// A first launch right after the server starts can lose a race (profile lock,
+		// a slow disk); one more attempt settles it without the person noticing.
+		pending = launch(userId)
+			.catch(async (err) => {
+				console.error(`[browser] launch failed, trying once more: ${firstLine(err)}`);
+				await pause(800);
+				return launch(userId);
+			})
+			.finally(() => opening.delete(userId));
 		opening.set(userId, pending);
 	}
 	return pending;
@@ -461,6 +549,7 @@ async function closeSession(userId: string) {
 	const keys = [...session.tabs.keys()];
 	sessions.delete(userId);
 	clearInterval(session.idleTimer);
+	forgetUserActivity(userId);
 	await session.context.close().catch(() => {});
 	for (const key of keys) {
 		emit(userId, key, { type: 'state', state: closedState(userId, key === USER_TAB ? null : key) });
@@ -505,16 +594,22 @@ function tabFor(userId: string, applicationId: string): Promise<Tab | undefined>
 	const key = `${userId}:${applicationId}`;
 	let task = rehydrating.get(key);
 	if (!task) {
+		loading.set(key, paused.url);
 		task = (async () => {
 			const session = await ensure(userId);
 			const tab = await openTab(session, applicationId);
 			tab.controller = 'user';
 			const url = await assertPublicUrl(paused.url).catch(() => null);
-			if (url) await tab.page.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});
-			await publishState(session, tab);
+			if (url) await gotoPatiently(tab.page, url).catch(() => {});
 			onRehydrated?.(userId, applicationId);
 			return tab;
-		})().finally(() => rehydrating.delete(key));
+		})().finally(() => {
+			rehydrating.delete(key);
+			loading.delete(key);
+			const session = sessions.get(userId);
+			const tab = session?.tabs.get(applicationId);
+			if (session && tab) void publishState(session, tab);
+		});
 		rehydrating.set(key, task);
 	}
 	return task;
@@ -575,20 +670,69 @@ export async function openForUser(
 	applicationId?: string | null
 ): Promise<BrowserState> {
 	const url = await assertPublicUrl(rawUrl);
-	const session = await ensure(userId);
-	const tab = await openTab(session, applicationId ?? USER_TAB);
-	assertNotAgent(tab);
-	tab.controller = 'user';
-	await tab.page.goto(url, { waitUntil: 'domcontentloaded' }).catch((err) => {
-		throw new ApiError(
-			502,
-			'navigation_failed',
-			`Não foi possível abrir a página: ${firstLine(err)}`
-		);
-	});
-	const state = await tabState(session, tab);
-	emit(userId, tab.key, { type: 'state', state });
-	return state;
+	const key = applicationId ?? USER_TAB;
+	assertNotAgent(sessions.get(userId)?.tabs.get(key));
+	noteUserActivity(userId, true);
+	openInBackground(userId, key, url);
+	// Answered at once: starting the browser and loading the page can take several
+	// seconds, and what happens next reaches the client through the stream.
+	return loadingState(userId, applicationId ?? null, url);
+}
+
+const openQueue = new Map<string, Promise<void>>();
+
+/** Starts the browser if needed and loads `url` in the tab; failures end up in the tab's state. */
+function openInBackground(userId: string, key: string, url: string) {
+	const id = `${userId}:${key}`;
+	const applicationId = key === USER_TAB ? null : key;
+	loading.set(id, url);
+	const run = async () => {
+		let error: string | null = null;
+		try {
+			const session = await ensure(userId);
+			const tab = await openTab(session, key);
+			if (tab.controller === 'agent') return;
+			tab.controller = 'user';
+			tab.loadError = null;
+			await publishState(session, tab);
+			await gotoPatiently(tab.page, url);
+		} catch (err) {
+			error = `Não foi possível abrir a página: ${firstLine(err)}`;
+			console.error(`[browser] open failed for ${new URL(url).hostname}: ${firstLine(err)}`);
+		} finally {
+			if (loading.get(id) === url) loading.delete(id);
+			const session = sessions.get(userId);
+			const tab = session?.tabs.get(key);
+			if (session && tab) {
+				tab.loadError = error;
+				await publishState(session, tab);
+			} else {
+				emit(userId, key, {
+					type: 'state',
+					state: { ...closedState(userId, applicationId), loadError: error }
+				});
+			}
+		}
+	};
+	const next = (openQueue.get(id) ?? Promise.resolve()).then(run, run);
+	openQueue.set(
+		id,
+		next.finally(() => {
+			if (openQueue.get(id) === tracked) openQueue.delete(id);
+		})
+	);
+	const tracked = openQueue.get(id)!;
+}
+
+/** A navigation that failed once (a cold browser, a hiccup) gets one more try. */
+async function gotoPatiently(page: Page, url: string) {
+	try {
+		await page.goto(url, { waitUntil: 'domcontentloaded' });
+	} catch (err) {
+		if (page.isClosed()) throw err;
+		await pause(700);
+		await page.goto(url, { waitUntil: 'domcontentloaded' });
+	}
 }
 
 /** Lets the user act on a tab that is already open (the page a paused application left). */
@@ -596,10 +740,20 @@ export async function takeControl(
 	userId: string,
 	applicationId?: string | null
 ): Promise<BrowserState> {
-	const tab = applicationId
-		? await tabFor(userId, applicationId)
-		: resolveTab(sessions.get(userId), null);
+	noteUserActivity(userId, true);
+	if (applicationId && !sessions.get(userId)?.tabs.get(applicationId)) {
+		// The tab of a paused application is gone (restart, idle close): bring it
+		// back in the background and answer at once.
+		const paused = pausedLookup?.(userId, applicationId);
+		if (paused) {
+			void tabFor(userId, applicationId).catch((err) =>
+				console.error(`[browser] could not reopen tab: ${firstLine(err)}`)
+			);
+			return loadingState(userId, applicationId, paused.url);
+		}
+	}
 	const session = sessions.get(userId);
+	const tab = resolveTab(session, applicationId);
 	if (!session || !tab) throw new ApiError(409, 'browser_closed', 'Esta aba não está aberta.');
 	assertNotAgent(tab);
 	tab.controller = 'user';
@@ -618,7 +772,12 @@ export async function userInput(
 		? await tabFor(userId, applicationId)
 		: resolveTab(sessions.get(userId), null);
 	const session = sessions.get(userId);
-	if (!session || !tab) throw new ApiError(409, 'browser_closed', 'Esta aba não está aberta.');
+	if (!session || !tab) {
+		if (loading.has(`${userId}:${applicationId ?? USER_TAB}`)) {
+			throw new ApiError(409, 'browser_loading', 'A página ainda está abrindo.');
+		}
+		throw new ApiError(409, 'browser_closed', 'Esta aba não está aberta.');
+	}
 	if (tab.controller !== 'user') {
 		throw new ApiError(
 			409,
@@ -629,6 +788,7 @@ export async function userInput(
 		);
 	}
 	session.lastActivity = Date.now();
+	noteUserActivity(userId);
 	const page = tab.page;
 	// Chromium only delivers input to the page in front.
 	await page.bringToFront().catch(() => {});

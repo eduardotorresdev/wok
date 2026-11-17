@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS confirmed_answer (
 	id TEXT PRIMARY KEY, user_id TEXT NOT NULL, question_key TEXT NOT NULL, question TEXT NOT NULL,
 	answer TEXT NOT NULL, updated_at INTEGER NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS confirmed_answer_user_key ON confirmed_answer (user_id, question_key);
+CREATE TABLE IF NOT EXISTS browser_user_session (
+	user_id TEXT PRIMARY KEY, last_activity INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS profile_document (
 	user_id TEXT PRIMARY KEY, markdown TEXT NOT NULL, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS profile_question (

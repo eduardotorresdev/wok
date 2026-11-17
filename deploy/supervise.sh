@@ -4,7 +4,8 @@
 # mudar (é assim que deploy.sh "reinicia", sem depender de systemctl nem de PID).
 # Forçar restart manual: touch $APP_ROOT/restart
 set -u
-export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
+# TinyTeX (pdflatex, tlmgr) vive no home do usuário; o app também recebe LATEX_BIN_DIR.
+export PATH="$HOME/.local/bin:$HOME/.TinyTeX/bin/x86_64-linux:/usr/local/bin:/usr/bin:/bin"
 export NODE_ENV=production
 APP_ROOT="${WOK_ROOT:-$HOME/wok}"
 child=""

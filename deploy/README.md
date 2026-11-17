@@ -70,3 +70,25 @@ heartbeat (comentário `: ping`) a cada ~15-30s e não comprimir essas respostas
 - Chromium do Playwright em `~/.cache/ms-playwright` (instalado a cada deploy na versão do
   lockfile; libs de sistema já presentes, sem `--with-deps` porque não há sudo).
 - `tectonic` 0.15 em `~/.local/bin` (baixa pacotes TeX sob demanda para `~/.cache/Tectonic`).
+- `tectonic` 0.15 segue instalado, mas o motor dos currículos é **pdfLaTeX** (TinyTeX).
+
+### pdfLaTeX (TinyTeX, sem sudo)
+
+Os currículos usam recursos só de pdfTeX (`microtype` com `\DisableLigatures`, `glyphtounicode`,
+`\pdfgentounicode`), que o tectonic (XeTeX) não compila. TinyTeX fica em `~/.TinyTeX`, do
+usuário `admin`, o mesmo do serviço, então o app pode rodar `tlmgr install` sob demanda.
+
+Reinstalar do zero:
+
+```bash
+curl -fsSL https://yihui.org/tinytex/install-bin-unix.sh | sh      # instala em ~/.TinyTeX
+export PATH="$HOME/.TinyTeX/bin/x86_64-linux:$PATH"
+tlmgr install microtype roboto fontaxes titlesec enumitem fancyhdr marvosym \
+  babel-portuges hyphen-portuguese preprint tools hyperref cm-super pdftexcmds \
+  xkeyval etoolbox latexsym amsfonts collection-fontsrecommended
+```
+
+O processo enxerga os binários por dois caminhos: `supervise.sh` põe
+`~/.TinyTeX/bin/x86_64-linux` no `PATH`, e o `.env` define `LATEX_BIN_DIR` com o mesmo
+diretório. O smoke roda `pdflatex --version`, compila um `.tex` mínimo com
+`microtype` + `\DisableLigatures` e confere que `~/.TinyTeX` é gravável.

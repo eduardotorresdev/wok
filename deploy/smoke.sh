@@ -3,7 +3,7 @@
 # Sem argumento testa o domínio público (ORIGIN do .env). Sai !=0 se algo falhar.
 #   SMOKE_EMAIL  destinatário do magic link (padrão: caixa de teste do Resend)
 set -u
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$HOME/.TinyTeX/bin/x86_64-linux:$PATH"
 APP_ROOT="${WOK_ROOT:-$HOME/wok}"
 ENV_FILE="$APP_ROOT/shared/.env"
 ORIGIN="$(grep -E '^ORIGIN=' "$ENV_FILE" | cut -d= -f2)"
@@ -65,6 +65,16 @@ tectonic_compiles() {
 	local rc=$?; rm -rf "$d"; return $rc
 }
 
+pdflatex_compiles() { # mínimo com microtype + DisableLigatures (só existe em pdfTeX)
+	local d; d="$(mktemp -d)"
+	printf '%s\n' '\documentclass{article}' '\usepackage[T1]{fontenc}' '\usepackage[utf8]{inputenc}' \
+		'\usepackage{microtype}' '\DisableLigatures{encoding = *, family = *}' \
+		'\begin{document}' 'Currículo: ação, experiência, fi fl.' '\end{document}' > "$d/s.tex"
+	( cd "$d" && pdflatex -interaction=nonstopmode -halt-on-error s.tex ) && [ -s "$d/s.pdf" ] &&
+		pdftotext "$d/s.pdf" - | grep -q 'Currículo: ação, experiência'
+	local rc=$?; rm -rf "$d"; return $rc
+}
+
 echo "smoke em $BASE (release $(cat "$APP_ROOT/current/build/REVISION" 2>/dev/null || echo '?'))"
 # Local: prova o app em si, independente de DNS/túnel.
 check "local /api/health 200 ($LOCAL)"            http_is "$LOCAL/api/health" 200
@@ -95,4 +105,7 @@ check "HTTPS /api/applications sem sessão -> 401 JSON" unauthorized_json "$BASE
 check "HTTPS /api/browser/state sem sessão -> 401 JSON" unauthorized_json "$BASE/api/browser/state"
 check "Chromium headless abre no servidor"       chromium_opens
 check "tectonic compila um .tex"                 tectonic_compiles
+check "pdflatex --version"                        pdflatex --version
+check "pdflatex compila microtype + DisableLigatures" pdflatex_compiles
+check "tlmgr utilizável pelo usuário do serviço"  test -w "$HOME/.TinyTeX" -a -x "$HOME/.TinyTeX/bin/x86_64-linux/tlmgr"
 exit $fail

@@ -89,6 +89,8 @@ export interface Profile {
 	certifications: { name: string; validUntil: string }[];
 	shifts: string[];
 	confidential: string[];
+	/** Email quando uma inscrição precisa da pessoa. Ausente em servidores antigos. */
+	notifyEmail?: boolean;
 	updatedAt?: string | null;
 }
 

@@ -70,6 +70,23 @@
 		});
 	}
 
+	// Vale na hora, sem depender do botão de salvar os outros dados.
+	function setNotify(value: boolean) {
+		if (!profileData.data) return;
+		profile.notifyEmail = value;
+		saveProfile.mutate(
+			{ ...emptyProfile(), ...$state.snapshot(profileData.data), notifyEmail: value },
+			{
+				onSuccess: () =>
+					toast({ text: value ? 'Vamos avisar por email.' : 'Avisos por email desligados.' }),
+				onError: () => {
+					profile.notifyEmail = !value;
+					failed();
+				}
+			}
+		);
+	}
+
 	function saveData() {
 		saveProfile.mutate($state.snapshot(profile), {
 			onSuccess: (saved) => {
@@ -216,6 +233,21 @@
 			<p class="mt-1 text-[0.9375rem] [overflow-wrap:anywhere] text-ink-soft">
 				{$session.data.user.email}
 			</p>
+		{/if}
+		{#if profileData.data?.notifyEmail !== undefined}
+			<label class="check mt-3">
+				<input
+					type="checkbox"
+					checked={profile.notifyEmail ?? true}
+					onchange={(event) => setNotify(event.currentTarget.checked)}
+				/>
+				<span>
+					Avisar por email quando precisar de mim
+					<span class="t-caption block">
+						Login, verificação ou pergunta que só você sabe responder.
+					</span>
+				</span>
+			</label>
 		{/if}
 		<button type="button" class="btn btn-quiet mt-4" disabled={leaving} onclick={signOut}>
 			<Icon name="logout" size={20} />

@@ -10,7 +10,7 @@ ExecStart=%h/wok/bin/supervise.sh
 Restart=always
 RestartSec=2
 KillMode=control-group
-TimeoutStopSec=20
+TimeoutStopSec=45
 
 [Install]
 WantedBy=default.target

@@ -12,7 +12,7 @@ child=""
 stop_child() {
 	[ -n "$child" ] || return 0
 	kill -TERM "$child" 2>/dev/null
-	for _ in $(seq 1 20); do kill -0 "$child" 2>/dev/null || break; sleep 0.5; done
+	for _ in $(seq 1 70); do kill -0 "$child" 2>/dev/null || break; sleep 0.5; done
 	kill -KILL "$child" 2>/dev/null
 	wait "$child" 2>/dev/null
 }

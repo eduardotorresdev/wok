@@ -30,6 +30,8 @@ export interface ApplyInput {
 	email: string;
 	profile: ProfileDto;
 	answers: ConfirmedAnswerDto[];
+	/** The person's professional profile as a system block, or null when they have none. */
+	profileContext: string | null;
 	area: string;
 	areaStrategy: string | null;
 	/** Log lines from earlier attempts at this same application, oldest first. */
@@ -241,7 +243,7 @@ Trabalhe em ritmo de gente: uma ação por vez, sem repetir a mesma ação em se
 
 ## De onde vêm as respostas
 
-Cada resposta de formulário sai do perfil, das respostas confirmadas ou do currículo que estão na mensagem. Quando o dado está lá, preencha sem perguntar. Quando não está, e não dá para deduzir com segurança, chame ask_user com a pergunta exata: é melhor pausar do que chutar, porque perguntas de triagem (autorização de trabalho, anos de experiência, formação, idioma, pretensão salarial, disponibilidade, mudança) eliminam candidatos e são conferidas depois. Nunca responda uma pergunta eliminatória com algo que não seja verdade para ajudar a pessoa a passar. Campos opcionais sem dado ficam em branco.
+Cada resposta de formulário sai do perfil, do perfil profissional (quando vier), das respostas confirmadas ou do currículo que estão na conversa. Quando o dado está lá, preencha sem perguntar. Quando não está, e não dá para deduzir com segurança, chame ask_user com a pergunta exata: é melhor pausar do que chutar, porque perguntas de triagem (autorização de trabalho, anos de experiência, formação, idioma, pretensão salarial, disponibilidade, mudança) eliminam candidatos e são conferidas depois. Nunca responda uma pergunta eliminatória com algo que não seja verdade para ajudar a pessoa a passar. Campos opcionais sem dado ficam em branco.
 
 ## Quando parar
 
@@ -325,6 +327,13 @@ export async function applyToJob(input: ApplyInput): Promise<ApplyOutcome> {
 	const systemBlocks: Anthropic.TextBlockParam[] = [
 		{ type: 'text', text: system(input), cache_control: { type: 'ephemeral' } }
 	];
+	if (input.profileContext) {
+		systemBlocks.push({
+			type: 'text',
+			text: input.profileContext,
+			cache_control: { type: 'ephemeral' }
+		});
+	}
 	let nudges = 0;
 
 	for (let turn = 0; turn < MAX_TURNS; turn++) {

@@ -22,6 +22,7 @@ import { getPreferences } from '../preferences.ts';
 import { sendNeedsUserEmail } from '../email.ts';
 import { config } from '../env.ts';
 import { getProfile, listAnswers, missingProfileQuestion } from '../profile.ts';
+import { profileContext } from '../profile-document.ts';
 import { compileResume, getResume, getResumeRow } from '../resume.ts';
 import { applyToJob, type ApplyOutcome } from './applier.ts';
 import { describeLlmError, hasLlm } from './llm.ts';
@@ -110,6 +111,7 @@ async function runApplication(applicationId: string) {
 				area,
 				areaStrategy: strategy,
 				confidential: profile.confidential,
+				profileContext: profileContext(userId),
 				workDir,
 				onProgress: (message) => logStep(applicationId, 'tailor', message)
 			});
@@ -178,6 +180,7 @@ async function runApplication(applicationId: string) {
 			email: user?.email ?? '',
 			profile,
 			answers: listAnswers(userId),
+			profileContext: profileContext(userId),
 			area,
 			areaStrategy: strategy,
 			history: hadAttempt ? history : [],

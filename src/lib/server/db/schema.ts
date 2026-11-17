@@ -162,3 +162,20 @@ export const confirmedAnswer = sqliteTable(
 	},
 	(t) => [uniqueIndex('confirmed_answer_user_key').on(t.userId, t.questionKey)]
 );
+
+/** The person's professional profile: free markdown, written and confirmed by them. */
+export const profileDocument = sqliteTable('profile_document', {
+	userId: text('user_id').primaryKey(),
+	markdown: text('markdown').notNull(),
+	updatedAt: integer('updated_at').notNull()
+});
+
+/** Questions whose answers would make the profile document more useful. */
+export const profileQuestion = sqliteTable('profile_question', {
+	id: text('id').primaryKey(),
+	userId: text('user_id').notNull(),
+	text: text('text').notNull(),
+	hint: text('hint'),
+	createdAt: integer('created_at').notNull(),
+	answeredAt: integer('answered_at')
+});

@@ -43,6 +43,12 @@ CREATE TABLE IF NOT EXISTS confirmed_answer (
 	id TEXT PRIMARY KEY, user_id TEXT NOT NULL, question_key TEXT NOT NULL, question TEXT NOT NULL,
 	answer TEXT NOT NULL, updated_at INTEGER NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS confirmed_answer_user_key ON confirmed_answer (user_id, question_key);
+CREATE TABLE IF NOT EXISTS profile_document (
+	user_id TEXT PRIMARY KEY, markdown TEXT NOT NULL, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS profile_question (
+	id TEXT PRIMARY KEY, user_id TEXT NOT NULL, text TEXT NOT NULL, hint TEXT,
+	created_at INTEGER NOT NULL, answered_at INTEGER);
+CREATE INDEX IF NOT EXISTS profile_question_user ON profile_question (user_id, answered_at);
 `;
 
 // Columns added after a table first shipped. CREATE TABLE IF NOT EXISTS never

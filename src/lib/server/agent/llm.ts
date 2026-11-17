@@ -25,11 +25,21 @@ export async function structured<T extends z.ZodType>(opts: {
 	system: string;
 	user: string;
 	maxTokens?: number;
+	/**
+	 * Text that repeats across calls (the person's profile): sent as a second,
+	 * cached system block so only the first call of a series pays for it.
+	 */
+	context?: string | null;
 }): Promise<z.infer<T>> {
 	const response = await anthropic().messages.parse({
 		model: MODEL,
 		max_tokens: opts.maxTokens ?? 16000,
-		system: opts.system,
+		system: opts.context
+			? [
+					{ type: 'text', text: opts.system },
+					{ type: 'text', text: opts.context, cache_control: { type: 'ephemeral' } }
+				]
+			: opts.system,
 		messages: [{ role: 'user', content: opts.user }],
 		output_config: { effort: EFFORT, format: zodOutputFormat(opts.schema) }
 	});

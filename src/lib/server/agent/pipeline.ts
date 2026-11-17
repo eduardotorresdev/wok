@@ -1,7 +1,20 @@
 import { eq } from 'drizzle-orm';
-import { getRow, listSteps, logStep, setStatus, update } from '../applications/store.ts';
-import { setRunner } from '../applications/queue.ts';
-import { acquireForAgent, releaseFromAgent } from '../browser/service.ts';
+import {
+	getRow,
+	listSteps,
+	logStep,
+	setLastUrl,
+	setStatus,
+	update
+} from '../applications/store.ts';
+import { enqueue, setRunner } from '../applications/queue.ts';
+import {
+	acquireForAgent,
+	releaseFromAgent,
+	setPausedTabSource,
+	watchBarrier,
+	type AgentBrowser
+} from '../browser/service.ts';
 import { db, schema, sqlite } from '../db/index.ts';
 import { compileLatex, userDir } from '../latex.ts';
 import { getPreferences } from '../preferences.ts';
@@ -132,11 +145,13 @@ async function runApplication(applicationId: string) {
 	const compiled = await compileLatex(tailoredLatex, `${workDir}/text`).catch(() => null);
 
 	let outcome: ApplyOutcome;
+	let browser: AgentBrowser | undefined;
 	try {
-		const browser = await acquireForAgent(userId, applicationId);
+		browser = await acquireForAgent(userId, applicationId);
+		const agentBrowser = browser;
 		logStep(applicationId, 'control', 'O agente assumiu o browser.', { controller: 'agent' });
 		outcome = await applyToJob({
-			browser,
+			browser: agentBrowser,
 			job: {
 				title: job.title,
 				company: job.company,
@@ -154,18 +169,24 @@ async function runApplication(applicationId: string) {
 			areaStrategy: strategy,
 			history: hadAttempt ? history : [],
 			dryRun,
-			onStep: (kind, message, data) => logStep(applicationId, kind, message, data)
+			onStep: (kind, message, data) => {
+				setLastUrl(applicationId, agentBrowser.url());
+				logStep(applicationId, kind, message, data);
+			}
 		});
 	} catch (err) {
 		outcome = { type: 'failed', message: `Erro durante a candidatura: ${describeLlmError(err)}` };
 	}
 
+	// Where it stopped is what lets the tab be rebuilt if the server restarts during the pause.
+	if (browser) setLastUrl(applicationId, browser.url());
+
 	if (outcome.type !== 'submitted' && outcome.type !== 'failed') {
-		// The page stays open and the person can act on it right away.
-		await releaseFromAgent(userId, 'user', true);
+		// The tab stays exactly as it is for the person; the queue moves on in another tab.
+		await releaseFromAgent(userId, applicationId, 'user');
 		logStep(applicationId, 'control', 'O browser está com você.', { controller: 'user' });
 	} else {
-		await releaseFromAgent(userId, 'idle');
+		await releaseFromAgent(userId, applicationId, 'close');
 		logStep(applicationId, 'control', 'O agente liberou o browser.', { controller: 'idle' });
 	}
 
@@ -185,12 +206,53 @@ async function runApplication(applicationId: string) {
 				{ needsKind: 'browser' }
 			);
 		case 'needs_browser':
-			return void setStatus(applicationId, 'needs_user', outcome.message, { needsKind: 'browser' });
+			setStatus(applicationId, 'needs_user', outcome.message, { needsKind: 'browser' });
+			return void resumeWhenBarrierClears(userId, applicationId);
 		case 'failed':
 			return void setStatus(applicationId, 'failed', outcome.message);
 	}
 }
 
+const MAX_AUTO_RESUMES = 3;
+
+/**
+ * When the pause is a login or verification screen, notice the person getting
+ * past it and continue without waiting for the "continue" button. Capped, so a
+ * site that keeps bouncing back to the barrier cannot loop the agent forever.
+ */
+function resumeWhenBarrierClears(userId: string, applicationId: string) {
+	const used = listSteps(applicationId).filter((s) => s.kind === 'auto_resume').length;
+	if (used >= MAX_AUTO_RESUMES) return;
+	watchBarrier(userId, applicationId, () => {
+		if (getRow(applicationId)?.status !== 'needs_user') return;
+		logStep(
+			applicationId,
+			'auto_resume',
+			'Vi que você passou pela verificação; continuando sozinho.'
+		);
+		setStatus(applicationId, 'queued', 'Retomando a inscrição.');
+		enqueue(userId, applicationId);
+	});
+}
+
+/** A paused application's tab can be rebuilt at the page where it stopped (or at the job). */
+function pausedTab(userId: string, applicationId: string) {
+	const app = getRow(applicationId);
+	if (!app || app.userId !== userId) return null;
+	// Only a pause that asks the person to act in the browser needs its tab back.
+	if (app.status !== 'needs_user' || app.needsKind !== 'browser') return null;
+	const job = db().select().from(schema.job).where(eq(schema.job.id, app.jobId)).get();
+	const url = app.lastUrl || job?.applyUrl || job?.url;
+	return url ? { url } : null;
+}
+
 export function registerPipeline() {
 	setRunner(runApplication);
+	// After a restart nothing is watching paused applications; the watch comes back
+	// together with the tab, when the person opens the viewer, not before.
+	setPausedTabSource(pausedTab, (userId, applicationId) => {
+		if (getRow(applicationId)?.needsKind === 'browser') {
+			resumeWhenBarrierClears(userId, applicationId);
+		}
+	});
 }

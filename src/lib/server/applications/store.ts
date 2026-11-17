@@ -169,6 +169,16 @@ export function update(
 	return row;
 }
 
+/** Remembers where the applier is, without notifying anyone: it changes on every navigation. */
+export function setLastUrl(applicationId: string, url: string) {
+	if (!/^https?:/i.test(url)) return;
+	db()
+		.update(schema.application)
+		.set({ lastUrl: url })
+		.where(eq(schema.application.id, applicationId))
+		.run();
+}
+
 /** Status change with a log line; the usual way the pipeline reports progress. */
 export function setStatus(
 	applicationId: string,

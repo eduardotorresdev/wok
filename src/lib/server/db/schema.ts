@@ -82,6 +82,8 @@ export const application = sqliteTable(
 		/** Set while status is needs_user: what the user has to do. */
 		needsKind: text('needs_kind').$type<'question' | 'browser' | 'resume'>(),
 		pendingQuestion: text('pending_question'),
+		/** Last page the applier was on; lets a paused application's tab be reopened after a restart. */
+		lastUrl: text('last_url'),
 		createdAt: integer('created_at').notNull(),
 		updatedAt: integer('updated_at').notNull()
 	},

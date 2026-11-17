@@ -25,5 +25,6 @@ const Body = z.discriminatedUnion('type', [
 
 export const POST = api(async (event) => {
 	const user = requireUser(event);
-	return json(await userInput(user.id, await parseBody(event, Body)));
+	const applicationId = event.url.searchParams.get('applicationId');
+	return json(await userInput(user.id, await parseBody(event, Body), applicationId));
 });

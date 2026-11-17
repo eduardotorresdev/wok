@@ -11,5 +11,8 @@ const Body = z.object({ url: z.string().trim().max(2000).optional() });
 export const POST = api(async (event) => {
 	const user = requireUser(event);
 	const { url } = await parseBody(event, Body);
-	return json(url ? await openForUser(user.id, url) : await takeControl(user.id));
+	const applicationId = event.url.searchParams.get('applicationId');
+	return json(
+		url ? await openForUser(user.id, url, applicationId) : await takeControl(user.id, applicationId)
+	);
 });

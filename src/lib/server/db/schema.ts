@@ -44,6 +44,7 @@ export const job = sqliteTable(
 		location: text('location'),
 		url: text('url').notNull(),
 		applyUrl: text('apply_url'),
+		applyType: text('apply_type').$type<'easy' | 'external'>(),
 		salary: text('salary'),
 		postedAt: text('posted_at'),
 		summary: text('summary'),

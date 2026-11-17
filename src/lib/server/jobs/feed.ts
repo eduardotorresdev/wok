@@ -15,6 +15,8 @@ export interface JobDto {
 	applyUrl: string | null;
 	/** Where the application goes through: the company's site, or the job board's own flow. */
 	applyVia: 'company' | 'linkedin' | 'glassdoor';
+	/** 'easy': form on the job board; 'external': its button leads to the company's site; null: unknown. */
+	applyType: 'easy' | 'external' | null;
 	/** False when applying needs an account that is not connected; see blockedBy. */
 	canApply: boolean;
 	blockedBy: 'linkedin' | 'glassdoor' | null;
@@ -60,6 +62,7 @@ export function jobDto(row: typeof schema.job.$inferSelect, accounts?: Connected
 		url: row.url,
 		applyUrl: row.applyUrl,
 		applyVia: applyVia(row),
+		applyType: row.applyType ?? null,
 		canApply: !blocked,
 		blockedBy: blocked,
 		salary: row.salary,

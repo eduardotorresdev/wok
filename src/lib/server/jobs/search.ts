@@ -181,6 +181,7 @@ function store(userId: string, jobs: CollectedJob[]) {
 				location: j.location,
 				url: j.url,
 				applyUrl: j.applyUrl,
+				applyType: j.applyType,
 				salary: j.salary,
 				postedAt: j.postedAt,
 				description: j.description,
@@ -189,7 +190,26 @@ function store(userId: string, jobs: CollectedJob[]) {
 			.onConflictDoNothing()
 			.run();
 		if (res.changes) ids.push(id);
-		else known++;
+		else {
+			known++;
+			// A posting stored before these fields existed gets them now.
+			if (j.applyType || j.applyUrl) {
+				db()
+					.update(schema.job)
+					.set({
+						...(j.applyType ? { applyType: j.applyType } : {}),
+						...(j.applyUrl ? { applyUrl: j.applyUrl } : {})
+					})
+					.where(
+						and(
+							eq(schema.job.userId, userId),
+							eq(schema.job.source, j.source),
+							eq(schema.job.externalId, j.externalId)
+						)
+					)
+					.run();
+			}
+		}
 	}
 	return { ids, repeated, known };
 }

@@ -152,6 +152,8 @@ export async function searchLinkedIn(
 			location: str(it.location),
 			url,
 			applyUrl: companyApplyUrl(str(it.applyUrl), str(it.descriptionHtml), str(it.description)),
+			applyType:
+				it.applyType === 'EASY_APPLY' ? 'easy' : it.applyType === 'EXTERNAL' ? 'external' : null,
 			salary: str(it.salary),
 			postedAt: str(it.postedDate),
 			description: str(it.description) ?? htmlToText(str(it.descriptionHtml) ?? '')
@@ -201,6 +203,7 @@ export async function searchGlassdoor(
 			location: str(location?.name),
 			url,
 			applyUrl: companyApplyUrl(str(it.applyUrl), str(it.description)),
+			applyType: it.easyApply === true ? 'easy' : it.easyApply === false ? 'external' : null,
 			salary: glassdoorSalary(it.pay),
 			postedAt: age == null ? null : new Date(Date.now() - age * 86_400_000).toISOString(),
 			description: htmlToText(str(it.description) ?? '')

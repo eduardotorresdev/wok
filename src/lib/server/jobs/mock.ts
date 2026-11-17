@@ -12,6 +12,7 @@ export function mockJobs(terms: string[], location: string): CollectedJob[] {
 			company: 'Aurora Pagamentos',
 			location: `${place} (remoto)`,
 			applyUrl: null,
+			applyType: null,
 			salary: 'R$ 14.000–18.000 / mês',
 			postedAt: day(1),
 			description: `Buscamos ${role} sênior para o time de produto. Você vai desenhar e entregar funcionalidades de ponta a ponta, revisar código e apoiar pessoas mais novas. Requisitos: experiência sólida na área, boa comunicação e inglês intermediário.`
@@ -21,6 +22,7 @@ export function mockJobs(terms: string[], location: string): CollectedJob[] {
 			company: 'Lume Saúde',
 			location: place,
 			applyUrl: null,
+			applyType: null,
 			salary: null,
 			postedAt: day(3),
 			description: `Vaga para ${role} pleno em healthtech em crescimento. Trabalho híbrido, squad multidisciplinar, foco em qualidade e métricas. Diferenciais: experiência com produtos regulados.`
@@ -30,6 +32,7 @@ export function mockJobs(terms: string[], location: string): CollectedJob[] {
 			company: 'Trilha Logística',
 			location: `${place} (híbrido)`,
 			applyUrl: null,
+			applyType: null,
 			salary: 'R$ 16.000–21.000 / mês',
 			postedAt: day(5),
 			description: `Atuação como referência técnica em ${role}, definindo padrões e apoiando decisões de arquitetura junto a liderança.`
@@ -39,6 +42,7 @@ export function mockJobs(terms: string[], location: string): CollectedJob[] {
 			company: 'Estúdio Norte',
 			location: 'Remoto',
 			applyUrl: null,
+			applyType: null,
 			salary: 'R$ 90 / hora',
 			postedAt: day(7),
 			description: `Projeto de 6 meses, com possibilidade de extensão. Time pequeno, autonomia alta, entregas quinzenais.`

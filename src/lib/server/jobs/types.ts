@@ -10,6 +10,8 @@ export interface CollectedJob {
 	location: string | null;
 	url: string;
 	applyUrl: string | null;
+	/** 'easy': the form is on the job board itself; 'external': its button leads to the company's site. */
+	applyType: 'easy' | 'external' | null;
 	salary: string | null;
 	postedAt: string | null;
 	description: string;

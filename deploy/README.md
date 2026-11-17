@@ -15,6 +15,10 @@ Só entra o que está **commitado** no ref (`git archive`), nunca o working tree
 Se o ref ainda não usa `@sveltejs/adapter-node`, o script troca o adapter apenas dentro da release.
 Se a release nova não responder em 90s, o symlink volta para a anterior.
 
+Antes de ativar, o deploy espera (até 15 min, `WOK_WAIT_INFLIGHT`) não haver inscrição em
+`tailoring`/`applying` nem busca `running`, porque o restart as interrompe; se não esvaziar,
+sai com código 3 sem trocar a release. `deploy/inflight.sh` mostra a contagem; `WOK_FORCE=1` ignora.
+
 ## Layout
 
 | Caminho | O quê |

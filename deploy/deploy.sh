@@ -48,6 +48,19 @@ pnpm build
 [ -f build/index.js ] || { echo "build/index.js não gerado (adapter-node?)"; exit 1; }
 echo "$SHA" > build/REVISION
 
+# Restart interrompe busca (vira failed) e inscrição em andamento (volta para a fila).
+# Espera terminar; WOK_WAIT_INFLIGHT=segundos (padrão 900), WOK_FORCE=1 ignora.
+echo "==> trabalho em andamento"
+waited=0
+until "$HERE/inflight.sh"; do
+	if [ "${WOK_FORCE:-0}" = "1" ]; then echo "   WOK_FORCE=1: seguindo mesmo assim"; break; fi
+	if [ "$waited" -ge "${WOK_WAIT_INFLIGHT:-900}" ]; then
+		echo "!! ainda há trabalho em andamento após ${waited}s; deploy NÃO ativado (release pronta em $REL)"
+		exit 3
+	fi
+	sleep 15; waited=$((waited + 15))
+done
+
 echo "==> backup"
 "$HERE/backup.sh" || echo "aviso: backup falhou"
 

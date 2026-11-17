@@ -77,6 +77,7 @@ check "local /api/auth respondendo (/api/auth/ok)" http_is "$LOCAL/api/auth/ok" 
 check "magic link real via Resend -> $EMAIL"      magic_link
 check "local /api/jobs/feed sem sessão -> 401 JSON"    unauthorized_json "$LOCAL/api/jobs/feed"
 check "local /api/applications sem sessão -> 401 JSON" unauthorized_json "$LOCAL/api/applications"
+check "local /api/browser/state sem sessão -> 401 JSON" unauthorized_json "$LOCAL/api/browser/state"
 # Público: DNS + túnel + TLS.
 check "HTTPS $BASE/ -> 303 /login"                redirects_to_login "$BASE/"
 for r in onboarding curriculo ajustes; do
@@ -87,6 +88,7 @@ check "HTTPS $BASE/api/health 200"                http_is "$BASE/api/health" 200
 check "HTTPS $BASE/api/auth/ok 200"               http_is "$BASE/api/auth/ok" 200
 check "HTTPS /api/jobs/feed sem sessão -> 401 JSON"    unauthorized_json "$BASE/api/jobs/feed"
 check "HTTPS /api/applications sem sessão -> 401 JSON" unauthorized_json "$BASE/api/applications"
+check "HTTPS /api/browser/state sem sessão -> 401 JSON" unauthorized_json "$BASE/api/browser/state"
 check "Chromium headless abre no servidor"       chromium_opens
 check "tectonic compila um .tex"                 tectonic_compiles
 exit $fail

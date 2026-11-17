@@ -1,0 +1,11 @@
+[Unit]
+Description=Cloudflare Tunnel do WOK (wok.eduardotorres.dev)
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate run --token-file %h/wok/shared/cloudflared.token
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

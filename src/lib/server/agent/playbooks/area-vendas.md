@@ -6,15 +6,15 @@ Confiança: [A] forte · [M] parcial · [B] convenção.
 ## O que o recrutador da área procura
 
 - **Resultado contra a meta, em número.** Recrutadores de vendas olham primeiro "performance against target", conquistas por cargo e exemplos de contratos ganhos, desenvolvidos ou geridos. [A]
-- **Contexto do que foi vendido**: 1 linha por empresa dizendo produto, mercado e tipo de cliente (B2B/B2C, PME/enterprise, canal direto/distribuidor). Mercado parecido com o da vaga pesa. [A]
-- **Tempo de casa e progressão** (SDR → AE, carteira maior, meta maior). Muitas passagens curtas e cargos sem detalhe são lidos como sinal de alerta. [A]
+- **Contexto do que foi vendido**: 1 linha por empresa dizendo produto, mercado e tipo de cliente (B2B/B2C, PME/enterprise, canal direto/distribuidor). Mercado parecido com o da vaga pesa. [M]
+- **Tempo de casa e progressão** (SDR → AE, carteira maior, meta maior). Muitas passagens curtas e cargos sem detalhe são lidos como sinal de alerta. [M]
 - **Tipo de venda compatível com a vaga**: SDR gera pipeline; AE abre e fecha negócio novo; KAM/farmer retém e expande carteira. Currículo de AE que só fala de relacionamento parece de pós-venda. [M — fonte comercial]
-- Treinamentos de vendas concluídos contam como qualificação. [A]
+- Treinamentos de vendas concluídos contam como qualificação. [M]
 
 ## Seções e ordem (o que muda)
 
-- Resumo (opcional): função + segmento + 1 número de meta. Escreva para o gestor, não como pitch para cliente. [A]
-- Experiência antes de Formação, salvo primeiro emprego. Todo cargo com mês/ano de início e fim, sem buracos visíveis. [A]
+- Resumo (opcional): função + segmento + 1 número de meta. Escreva para o gestor, não como pitch para cliente. [M]
+- Experiência antes de Formação, salvo primeiro emprego. Todo cargo com mês/ano de início e fim: datas vagas levantam suspeita. Lacuna real fica como está; nunca estique datas para cobri-la. [M]
 - Abaixo de cada empresa, 1 linha de contexto (`SaaS de RH para PMEs, venda consultiva, ciclo ~45 dias`) e depois os bullets.
 - Primeiro bullet de cada cargo = atingimento de meta. Prêmios e ranking entram no bullet do cargo em que ocorreram, não em seção própria.
 - Habilidades: CRM e ferramentas de prospecção; metodologias só as realmente aplicadas.
@@ -82,7 +82,7 @@ Use o termo exato da vaga e só o que o usuário domina.
 ## Na inscrição
 
 - **Triagem típica**: anos de experiência em vendas B2B/B2C; segmento e ticket médio vendidos; CRM usado; experiência com outbound/cold call; modelo de contratação aceito (CLT, PJ, comissão pura); pretensão de fixo e de variável (OTE); CNH e veículo próprio e disponibilidade para viagens (vendas externas); inglês/espanhol.
-- **Etapas comuns**: role-play de cold call ou de reunião de descoberta, case de plano de território/conta, teste de perfil comportamental, entrevista com o gestor pedindo números e, às vezes, comprovação (print de ranking, holerite de comissão). [B]
+- **Etapas comuns**: role-play de cold call ou de reunião de descoberta, case de plano de território/conta, teste de perfil comportamental, entrevista com o gestor pedindo números e, às vezes, comprovação (print de ranking, holerite de comissão). [B] Pedido de comprovante ou documento no formulário: pare e devolva ao usuário.
 - **Pergunte ao usuário antes de responder**: metas e atingimento por período (e se pode divulgá-los); fixo x variável atual e pretendido; se aceita PJ/comissão; CNH/veículo; se tem cláusula de não concorrência ou sigilo com o empregador atual; quais clientes pode citar.
 - Representante comercial autônomo: algumas vagas pedem registro no CORE do estado; informe só se o usuário tiver. [B]
 
@@ -90,9 +90,9 @@ Use o termo exato da vaga e só o que o usuário domina.
 
 - Michael Page UK — How to spot a great sales CV: https://www.michaelpage.co.uk/recruitment-expertise/sales/how-to-spot-a-great-sales-CV
 - Michael Page UK — Creating a sales CV that stands out: https://www.michaelpage.co.uk/advice/career-advice/cover-letter-and-cv-advice/creating-sales-cv-stands-out
-- Michael Page UK — How to write a CV for your sector: https://www.michaelpage.co.uk/advice/career-advice/cover-letter-and-cv-advice/how-write-cv-your-sector
+- Michael Page UK — How to write a CV for your sector (resultado de busca, não aberto): https://www.michaelpage.co.uk/advice/career-advice/cover-letter-and-cv-advice/how-write-cv-your-sector
 - Hays — How to include quantifiable results in your CV: https://www.hays.co.uk/career-advice/article/add-quantifiable-results-to-cv
 - Robert Half Brasil — Recrutamento de vendas e marketing (cargos e perfil): https://www.roberthalf.com/br/pt/recrutamento-vendas-marketing
-- Rework — modelo de descrição de cargo de SDR (termos e ferramentas das vagas): https://resources.rework.com/pt/libraries/job-description-templates/sdr
-- ResumeGeni — Sales Development Representative resume guide (fonte comercial): https://resumegeni.com/blog/sales-development-representative-resume-guide
-- SyncGTM — How to put B2B sales experience on a resume (fonte comercial): https://syncgtm.com/blog/how-to-put-b2b-sales-experience-on-a-resume
+- Rework — modelo de descrição de cargo de SDR (termos e ferramentas das vagas) (resultado de busca, não aberto; fonte comercial): https://resources.rework.com/pt/libraries/job-description-templates/sdr
+- ResumeGeni — Sales Development Representative resume guide (resultado de busca, não aberto; fonte comercial): https://resumegeni.com/blog/sales-development-representative-resume-guide
+- SyncGTM — How to put B2B sales experience on a resume (resultado de busca, não aberto; fonte comercial): https://syncgtm.com/blog/how-to-put-b2b-sales-experience-on-a-resume

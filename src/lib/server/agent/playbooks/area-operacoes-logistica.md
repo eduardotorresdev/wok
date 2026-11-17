@@ -3,12 +3,12 @@ Complementa `geral-curriculo.md` e `geral-adaptacao-vaga.md`. Aplica-se a: opera
 Confiança: [A] forte · [M] parcial · [B] convenção.
 
 ## O que o recrutador da área procura
-- **Indicador com antes e depois**: custo, prazo, nível de serviço, estoque. As vagas pedem explicitamente "monitorar indicadores (SLA, OTD, OTIF, lead time)" e propor ações corretivas. [A]
+- **Indicador com antes e depois**: custo, prazo, nível de serviço, estoque. As vagas pedem explicitamente "monitorar indicadores (SLA, OTD, OTIF, lead time)" e propor ações corretivas. [M — leitura de vagas]
 - **Escala da operação**: m² de CD, nº de SKUs, pedidos/dia, frota, nº de fornecedores, valor de compras (spend), turnos e headcount. Sem escala, o leitor não sabe comparar com a vaga. [M]
-- **Sistemas**: ERP (SAP, TOTVS), WMS, TMS, Excel avançado e Power BI aparecem na maioria das vagas de analista. [A]
-- **Método**: ferramentas de análise e melhoria realmente usadas (Pareto, 5 porquês, PDCA, Kaizen, Lean, Six Sigma). [A]
-- **Interface com outras áreas**: vagas de liderança pedem relacionamento entre logística, produção, compras e comercial. [A]
-- Importação/exportação e gestão de operadores logísticos e transportadoras, quando a vaga cita. [A]
+- **Sistemas**: ERP (SAP, TOTVS), WMS, TMS, Excel avançado e Power BI aparecem na maioria das vagas de analista. [M — leitura de vagas]
+- **Método**: ferramentas de análise e melhoria realmente usadas (Pareto, 5 porquês, PDCA, Kaizen, Lean, Six Sigma). [M — leitura de vagas]
+- **Interface com outras áreas**: vagas de liderança pedem relacionamento entre logística, produção, compras e comercial. [M — leitura de vagas]
+- Importação/exportação e gestão de operadores logísticos e transportadoras, quando a vaga cita. [M — leitura de vagas]
 
 ## Seções e ordem (o que muda)
 - Abaixo de cada empresa, 1 linha de contexto da operação: `CD de 18 mil m², 9 mil SKUs, 3 turnos, operação fracionada B2B`.
@@ -49,7 +49,7 @@ Use o termo exato da vaga e só o que o usuário domina.
 - **Comex**: importação, exportação, Incoterms, desembaraço aduaneiro, Siscomex/DUIMP, drawback, câmbio.
 - **Melhoria/qualidade**: Lean Manufacturing, Six Sigma, Kaizen, 5S, PDCA, DMAIC, VSM, Kanban, TPM, OEE, 5 porquês, Pareto, Ishikawa, ISO 9001.
 - **Sistemas**: SAP (MM, PP, SD, WM/EWM), TOTVS Protheus, Oracle, WMS, TMS, Excel avançado (Power Query, tabela dinâmica), Power BI, SQL.
-- **Certificações**: Green/Black Belt; APICS/ASCM — CPIM (planejamento e estoques), CSCP (cadeia ponta a ponta), CLTD (logística, transporte e distribuição), CTSC (transformação). [A]
+- **Certificações**: Green/Black Belt; APICS/ASCM — CPIM (planejamento e estoques), CSCP (cadeia ponta a ponta), CLTD (logística, transporte e distribuição), CTSC (transformação). [M — página oficial da ASCM não pôde ser lida; resumo de busca]
 
 ## Portfólio e links
 - Não há portfólio padrão; LinkedIn basta. Não anexe layouts de armazém, planilhas ou contratos do empregador.
@@ -62,7 +62,7 @@ Use o termo exato da vaga e só o que o usuário domina.
 - **Gestão**: headcount e turnos, orçamento (OPEX/CAPEX), nível de serviço e custo da operação, segurança, implantações (WMS, novo CD, troca de operador), negociações com sindicato e terceiros.
 
 ## Erros comuns
-- Descrever o fluxo da operação ("recebimento, conferência, armazenagem...") em vez do que o usuário melhorou. [A]
+- Descrever o fluxo da operação ("recebimento, conferência, armazenagem...") em vez do que o usuário melhorou. [M]
 - Indicador sem escala nem período (`reduzi custos em 20%` de quê, em quanto tempo?).
 - Atribuir a si o saving do time ou um ganho projetado que não foi validado pela controladoria.
 - Jargão interno (nomes de projetos, códigos de planta) que só a empresa anterior entende.
@@ -76,11 +76,11 @@ Use o termo exato da vaga e só o que o usuário domina.
 - Não marque como válido curso ou habilitação vencidos; informe a data real.
 
 ## Fontes
-- ASCM — APICS certifications (CPIM, CSCP, CLTD, CTSC): https://www.ascm.org/learning-development/certifications-credentials/
+- ASCM — APICS certifications (CPIM, CSCP, CLTD, CTSC) (página voltou vazia; conteúdo do resumo da busca): https://www.ascm.org/learning-development/certifications-credentials/
 - University of Maryland, Smith School — Sample supply chain student resume: https://networth.rhsmith.umd.edu/sites/default/files/_docs/Sample%20Supply%20Chain%20Student%20Resume.pdf
 - Hays — How to include quantifiable results in your CV: https://www.hays.co.uk/career-advice/article/add-quantifiable-results-to-cv
-- Michael Page Brasil — vagas de logística (requisitos recorrentes): https://www.michaelpage.com.br/jobs/logística
-- Unilever Careers — Analista de Logística (SAP, Excel, Power BI, métodos de análise): https://careers.unilever.com/pt-br/vaga/pouso-alegre/analista-de-logistica/34155/99066964832
-- Vagas.com.br, Mapa de Carreiras — Analista de compras e logística (termos recorrentes): https://www.vagas.com.br/mapa-de-carreiras/cargos/analista-de-compras-e-logistica
-- MRPeasy — Supply chain KPIs (definições; fonte comercial): https://mrpeasy.com/blog/supply-chain-kpis
-- Penn State Smeal, Business Career Center — Resume packet: https://careerconnections.smeal.psu.edu/wp-content/uploads/sites/15/2019/06/Resume-Packet.pdf
+- Michael Page Brasil — vagas de logística (requisitos recorrentes) (resultado de busca, não aberto): https://www.michaelpage.com.br/jobs/logística
+- Unilever Careers — Analista de Logística (SAP, Excel, Power BI, métodos de análise) (resultado de busca, não aberto): https://careers.unilever.com/pt-br/vaga/pouso-alegre/analista-de-logistica/34155/99066964832
+- Vagas.com.br, Mapa de Carreiras — Analista de compras e logística (termos recorrentes) (resultado de busca, não aberto): https://www.vagas.com.br/mapa-de-carreiras/cargos/analista-de-compras-e-logistica
+- MRPeasy — Supply chain KPIs (definições) (resultado de busca, não aberto; fonte comercial): https://mrpeasy.com/blog/supply-chain-kpis
+- Penn State Smeal, Business Career Center — Resume packet (resultado de busca, não aberto): https://careerconnections.smeal.psu.edu/wp-content/uploads/sites/15/2019/06/Resume-Packet.pdf

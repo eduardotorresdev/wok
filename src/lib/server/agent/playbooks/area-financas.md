@@ -4,18 +4,18 @@ Confiança: [A] forte · [M] parcial · [B] convenção.
 
 ## O que o recrutador da área procura
 - **Registro e certificação exigidos pela função**, visíveis no topo. Para contador, o exercício legal da profissão depende de registro ativo no CRC; a aprovação no Exame de Suficiência sozinha não basta. [A]
-- **Sistemas nomeados**: ERP (SAP, Oracle, TOTVS) e nível de Excel. ERP está entre as competências pelas quais empresas pagam mais, e as vagas brasileiras pedem "Excel avançado" quase sempre. [A]
+- **Sistemas nomeados**: ERP (SAP, Oracle, TOTVS) e nível de Excel. ERP está entre as competências pelas quais empresas pagam mais, e as vagas brasileiras pedem "Excel avançado" quase sempre. [M]
 - **Escopo em números**: orçamento gerido, prazo de fechamento, nº de entidades/CNPJs, economia gerada, pessoas treinadas ou supervisionadas. [A]
 - **Normas e rotina**: CPC/IFRS, fechamento mensal, conciliações, DRE, fluxo de caixa, budget e forecast, com o papel exato do candidato.
-- **Precisão**: erro de digitação ou número inconsistente pesa mais aqui que em outras áreas (lido como falta de atenção a detalhes). [A]
+- **Precisão**: erro de digitação ou número inconsistente pesa mais aqui que em outras áreas (lido como falta de atenção a detalhes). [M]
 - **Inglês**: fluente/avançado é comum em FP&A, controladoria e multinacionais; intermediário em rotinas locais e fiscais. [M]
 
 ## Seções e ordem (o que muda)
-- Cabeçalho ou primeira linha do resumo: registro/certificação que a vaga exige (`CRC-SP 1SP000000/O-0`, `CPA + C-Pro R (ANBIMA)`). Repita em Certificações com órgão emissor e situação (ativa, em transição, em andamento). [A]
-- Formato cronológico inverso, visual sóbrio (sem cor nem elemento gráfico): é a convenção da área. [A]
+- Cabeçalho ou primeira linha do resumo: registro/certificação que a vaga exige (`CRC-SP 1SP000000/O-0`, `CPA + C-Pro R (ANBIMA)`). Repita em Certificações com órgão emissor e situação (ativa, em transição, em andamento). [M]
+- Formato cronológico inverso, visual sóbrio (sem cor nem elemento gráfico): é a convenção da área. [M]
 - Habilidades agrupadas: `ERP`, `Excel/BI`, `Normas`, `Idiomas`.
 - **Bancos/M&A**: em cada cargo, 2–3 transações mais relevantes com tipo, setor, porte e a contribuição do usuário (modelo, valuation, due diligence, material). Para júnior, Formação sobe e inclui ligas, competições e cursos de modelagem. [M]
-- Trabalho temporário/terceirizado em contabilidade entra como experiência normal, identificado como tal. [A]
+- Trabalho temporário/terceirizado em contabilidade entra como experiência normal, identificado como tal. [M]
 
 ## Métricas típicas
 Os exemplos abaixo são ilustrativos: no currículo só entram números que o usuário forneceu ou confirmou.
@@ -64,8 +64,8 @@ Use o termo exato da vaga e só o que o usuário domina.
 - Listar rotinas ("lançamentos, conciliações, relatórios") sem volume, prazo ou sistema. [A]
 - Certificação escondida no fim da página ou sem situação. Em 2026, quem tem CPA-10, CPA-20 ou CEA está "em transição" para CPA / C-Pro R / C-Pro I (CPA-10 → CPA; CPA-20 → CPA + C-Pro R; CEA → as três); pergunte ao usuário o status e escreva o nome atual, citando o antigo entre parênteses se a vaga ainda o usa. [A]
 - Declarar-se "contador" sem CRC ativo: use o cargo real (analista/assistente contábil). [A]
-- Mito: "CFA serve para qualquer vaga de finanças". Em contabilidade corporativa ele pesa menos que credenciais contábeis; é relevante em análise de investimentos, gestão e research. [A]
-- Siglas internas da empresa e jargão que o leitor de fora não entende. [A]
+- Mito: "CFA serve para qualquer vaga de finanças". Em contabilidade corporativa ele pesa menos que credenciais contábeis; é relevante em análise de investimentos, gestão e research. [M]
+- Siglas internas da empresa e jargão que o leitor de fora não entende. [M]
 - Expor números de cliente ou de empresa fechada.
 
 ## Na inscrição
@@ -80,6 +80,6 @@ Use o termo exato da vaga e só o que o usuário domina.
 - CFC — Aprovação no Exame de Suficiência: próximos passos para exercer a profissão: https://cfc.org.br/?p=94258
 - ANBIMA — Transição para as novas certificações: https://www.anbima.com.br/pt_br/especial/transicao-novas-certificacoes.htm
 - ANBIMA — Regras de transição das atuais para as novas certificações de distribuição: https://www.anbima.com.br/pt_br/noticias/anbima-apresenta-regras-de-transicao-das-atuais-para-as-novas-certificacoes-profissionais-de-distribuicao.htm
-- Robert Half Brasil — vagas de finanças (requisitos recorrentes: ERP, Excel, inglês, CRC): https://www.roberthalf.com/br/pt/vagas/all/financas
-- University of Pennsylvania Career Services — currículo para banking: https://careerservices.upenn.edu/?p=135205
-- Mergers & Inquisitions — How to write an investment banking resume (fonte comercial): https://www.mergersandinquisitions.com/investment-banking-resumes/
+- Robert Half Brasil — vagas de finanças (requisitos recorrentes: ERP, Excel, inglês, CRC) (resultado de busca, não aberto): https://www.roberthalf.com/br/pt/vagas/all/financas
+- University of Pennsylvania Career Services — currículo para banking (resultado de busca, não aberto): https://careerservices.upenn.edu/?p=135205
+- Mergers & Inquisitions — How to write an investment banking resume (resultado de busca, não aberto; fonte comercial): https://www.mergersandinquisitions.com/investment-banking-resumes/

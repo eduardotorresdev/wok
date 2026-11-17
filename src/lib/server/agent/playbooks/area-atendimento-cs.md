@@ -3,18 +3,18 @@ Complementa `geral-curriculo.md` e `geral-adaptacao-vaga.md`. Aplica-se a: atend
 Confiança: [A] forte · [M] parcial · [B] convenção.
 
 ## O que o recrutador da área procura
-- **Volume + qualidade + velocidade, em número**: quantos atendimentos, com que satisfação e em quanto tempo. Tempo de resolução, satisfação e retenção mostram o impacto de imediato. [A]
+- **Volume + qualidade + velocidade, em número**: quantos atendimentos, com que satisfação e em quanto tempo. Tempo de resolução, satisfação e retenção mostram o impacto de imediato. [M]
 - **Trilha certa**. Atendimento/suporte é reativo: fila, SLA, resolução, satisfação. Customer success é proativo: carteira, adoção, retenção, renovação e expansão de receita. Não misture os vocabulários; use o da vaga. [M]
-- **Canais e ferramentas nomeados**: telefone, chat, e-mail, WhatsApp, redes sociais; plataforma de tickets/CRM. [A]
-- **Casos difíceis**: escalonamentos, cliente insatisfeito, causa raiz identificada e corrigida. [A]
-- **Em CS**: tamanho e perfil da carteira e indicadores de receita (churn, NRR/GRR, upsell), além de NPS/CSAT. [A — vagas brasileiras pedem exatamente esses termos]
+- **Canais e ferramentas nomeados**: telefone, chat, e-mail, WhatsApp, redes sociais; plataforma de tickets/CRM. [M — fonte comercial]
+- **Casos difíceis**: escalonamentos, cliente insatisfeito, causa raiz identificada e corrigida. [M — fonte comercial]
+- **Em CS**: tamanho e perfil da carteira e indicadores de receita (churn, NRR/GRR, upsell), além de NPS/CSAT. [M — leitura de vagas brasileiras]
 - Experiência com IA no atendimento (chatbots, copilotos, roteamento automático), se o usuário tiver. [M]
 
 ## Seções e ordem (o que muda)
 - Abaixo de cada empresa, 1 linha de contexto: produto, tipo de cliente (B2C/B2B), canais, tamanho do time ou da carteira.
 - Primeiro bullet de cada cargo: volume atendido + indicador de qualidade (atendimento) ou carteira + retenção (CS).
-- Habilidades agrupadas: `Ferramentas`, `Canais`, `Idiomas` (com nível honesto: vaga bilíngue testa o idioma na entrevista). [A]
-- Primeiro emprego: experiências com público (varejo, recepção, voluntariado, monitoria) contam, rotuladas como tal. [A]
+- Habilidades agrupadas: `Ferramentas`, `Canais`, `Idiomas` (com nível honesto: vaga bilíngue testa o idioma na entrevista). [M — fonte comercial]
+- Primeiro emprego: experiências com público (varejo, recepção, voluntariado, monitoria) contam, rotuladas como tal. [M — fonte comercial]
 - Promoções internas (atendente → analista → supervisor) ficam visíveis como cargos separados na mesma empresa.
 
 ## Métricas típicas
@@ -47,7 +47,7 @@ Use o termo exato da vaga e só o que o usuário domina. Vagas alternam "atendim
 - **Customer success**: onboarding, implantação, adoção, engajamento, health score, QBR, renovação, expansão, upsell, cross-sell, churn, NRR, GRR, LTV, jornada do cliente, playbooks, high touch/low touch/tech touch.
 - **Métricas**: CSAT, NPS, CES, TMA (AHT), TME, FCR, FRT, TMR.
 - **Ferramentas**: Zendesk, Freshdesk, Salesforce Service Cloud, HubSpot, Intercom, Blip, Octadesk, Movidesk, Jira Service Management, Gainsight, Hi Platform, Excel, Power BI.
-Siglas valem quando a vaga as usa; fora disso, escreva por extenso na primeira vez. Excesso de sigla torna o currículo difícil de ler. [A]
+Siglas valem quando a vaga as usa; fora disso, escreva por extenso na primeira vez. Excesso de sigla torna o currículo difícil de ler. [M — fonte comercial]
 
 ## Portfólio e links
 - Não há portfólio padrão; LinkedIn basta.
@@ -60,11 +60,11 @@ Siglas valem quando a vaga as usa; fora disso, escreva por extenso na primeira v
 - **Gestão (supervisor, coordenador, head)**: resultado do time, dimensionamento e escala, monitoria e coaching, implantação de ferramenta ou canal, redução de custo por contato, relação com produto/comercial e, em BPO, com o cliente contratante.
 
 ## Erros comuns
-- "Atendimento ao público" e "resolução de problemas" sem volume nem indicador. [A]
-- Só adjetivos ("empático", "comunicativo") sem um fato que os mostre. [A]
+- "Atendimento ao público" e "resolução de problemas" sem volume nem indicador. [M]
+- Só adjetivos ("empático", "comunicativo") sem um fato que os mostre. [M — fonte comercial]
 - Currículo de CS escrito como SAC (só satisfação, sem retenção nem receita) ou o inverso.
-- Inflar nível de idioma em vaga bilíngue. [A]
-- Dado pessoal ou caso identificável de cliente no texto. [A]
+- Inflar nível de idioma em vaga bilíngue. [M — fonte comercial]
+- Dado pessoal ou caso identificável de cliente no texto. [M — fonte comercial]
 - Mito: benchmarks universais ("CSAT bom é acima de 85%"). Não têm fonte confiável e variam por setor; compare com a meta da própria operação.
 
 ## Na inscrição
@@ -74,11 +74,11 @@ Siglas valem quando a vaga as usa; fora disso, escreva por extenso na primeira v
 - Não marque disponibilidade de horário que o usuário não confirmou: é eliminatório e será cobrado na contratação.
 
 ## Fontes
-- Zendesk — Currículos de atendimento ao cliente: exemplos e dicas (fornecedor de software de atendimento): https://www.zendesk.com.br/blog/customer-service/support/customer-service-resume/
+- Zendesk — Currículos de atendimento ao cliente: exemplos e dicas (aberto; fonte comercial): https://www.zendesk.com.br/blog/customer-service/support/customer-service-resume/
 - Hays — How to include quantifiable results in your CV: https://www.hays.co.uk/career-advice/article/add-quantifiable-results-to-cv
-- Indeed Career Guide — How to write the best customer service resume: https://www.indeed.com/career-advice/resumes-cover-letters/best-customer-service-resume
+- Indeed Career Guide — How to write the best customer service resume (resultado de busca, não aberto): https://www.indeed.com/career-advice/resumes-cover-letters/best-customer-service-resume
 - MTE — NR-17, Anexo II (teleatendimento/telemarketing), texto atualizado 2021: https://www.gov.br/trabalho-e-emprego/pt-br/acesso-a-informacao/participacao-social/conselhos-e-orgaos-colegiados/comissao-tripartite-partitaria-permanente/arquivos/normas-regulamentadoras/nr-17-anexo-ii-teleatendimento-atualizado-2021.pdf
 - Suzuki, B. (UNESP, 2024) — Área de sucesso do cliente: estudo de caso sobre crescimento e retenção de receita (TCC): https://repositorio.unesp.br/bitstreams/3b49248e-ac65-4d95-954e-7d26c1debbea/download
-- Experian Careers — Analista de Sucesso do Cliente Pleno (requisitos de vaga): https://jobs.experian.com/job/analista-de-sucesso-do-cliente-customer-success-pleno-in-sao-paulo-brazil-jid-6067
-- QuestionPro — Indicadores de atendimento ao cliente (definições; fonte comercial): https://questionpro.com/blog/pt-br/indicadores-de-atendimento-ao-cliente
-- ResumeGeni — Customer Success Manager resume guide (fonte comercial): https://resumegeni.com/blog/customer-success-manager-professional-summary
+- Experian Careers — Analista de Sucesso do Cliente Pleno (requisitos de vaga) (resultado de busca, não aberto): https://jobs.experian.com/job/analista-de-sucesso-do-cliente-customer-success-pleno-in-sao-paulo-brazil-jid-6067
+- QuestionPro — Indicadores de atendimento ao cliente (definições) (resultado de busca, não aberto; fonte comercial): https://questionpro.com/blog/pt-br/indicadores-de-atendimento-ao-cliente
+- ResumeGeni — Customer Success Manager resume guide (resultado de busca, não aberto; fonte comercial): https://resumegeni.com/blog/customer-success-manager-professional-summary

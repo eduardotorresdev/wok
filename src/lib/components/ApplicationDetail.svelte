@@ -46,6 +46,7 @@
 	const resume = createMutation(() => resumeApplicationMutation(client));
 	const markSubmitted = createMutation(() => markSubmittedMutation(client));
 	const via = $derived(app ? applyViaLabel(app.job) : null);
+	let offsite = $state<HTMLElement>();
 
 	function markDone() {
 		if (!app) return;
@@ -154,8 +155,9 @@
 </script>
 
 {#if app}
-	<Sheet bind:open title={app.job.title} description={app.job.company} tall>
-		<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+	<Sheet bind:open title={app.job.title} description={app.job.company} tall compact={needsBrowser}>
+		<!-- Com o visor aberto, o cabeçalho encolhe: a altura é da página remota. -->
+		<div class="flex flex-wrap items-center gap-x-3 gap-y-1" class:hidden={needsBrowser}>
 			<StatusMark status={app.status} />
 			<a
 				href={app.job.url}
@@ -168,7 +170,7 @@
 				<Icon name="external" size={14} />
 			</a>
 		</div>
-		{#if via}
+		{#if via && !needsBrowser}
 			<p class="t-caption mb-2 flex items-center gap-1.5"><Icon name="send" size={14} />{via}</p>
 		{/if}
 		{#if app.lastMessage && app.status !== 'needs_user'}
@@ -258,24 +260,22 @@
 				</a>
 			</section>
 		{:else if needsBrowser}
-			<section class="mt-3">
-				<p class="rounded-sm bg-primary-tint p-3 text-[0.9375rem] leading-snug">
+			<section>
+				<p class="line-clamp-3 rounded-sm bg-primary-tint px-3 py-2 text-sm leading-snug">
 					{app.lastMessage ?? 'O site pediu login ou uma verificação.'}
-					<span class="text-ink-soft">
-						Resolva na tela abaixo e toque em "Continuar inscrição".
-					</span>
+					<span class="text-ink-soft">Resolva abaixo e toque em "Continuar inscrição".</span>
 				</p>
-				<div class="mt-3">
+				<div class="mt-2">
 					<BrowserView
 						mode="control"
 						takeover
-						maxHeight={0.5}
+						fit
 						applicationId={app.id}
 						fallbackUrl={app.job.url}
 					/>
 				</div>
 				<!-- Saída sem o visor: a pessoa se inscreve no site e avisa aqui. -->
-				<div class="mt-5 border-t border-line pt-4">
+				<div class="mt-5 border-t border-line pt-4" bind:this={offsite}>
 					<h3 class="t-title">Prefere fazer pelo site?</h3>
 					<p class="mt-1 text-sm leading-snug text-ink-soft">
 						Abra a vaga, envie o currículo adaptado e marque aqui quando terminar.
@@ -390,9 +390,23 @@
 					Tentar de novo
 				</button>
 			{:else if needsBrowser}
-				<button type="button" class="btn w-full" disabled={resume.isPending} onclick={carryOn}>
-					Continuar inscrição
-				</button>
+				<div class="flex gap-2">
+					<button
+						type="button"
+						class="btn btn-quiet shrink-0 px-4"
+						onclick={() => offsite?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+					>
+						Fazer pelo site
+					</button>
+					<button
+						type="button"
+						class="btn min-w-0 flex-1 px-3"
+						disabled={resume.isPending}
+						onclick={carryOn}
+					>
+						Continuar inscrição
+					</button>
+				</div>
 			{:else if app.status === 'failed'}
 				<button type="button" class="btn w-full" disabled={resume.isPending} onclick={carryOn}>
 					<Icon name="refresh" size={20} />

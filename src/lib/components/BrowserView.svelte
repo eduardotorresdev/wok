@@ -17,6 +17,7 @@
 		shortcuts = false,
 		takeover = false,
 		maxHeight = 0.56,
+		fit = false,
 		applicationId,
 		fallbackUrl,
 		onstate
@@ -28,6 +29,8 @@
 		takeover?: boolean;
 		/** Altura máxima da tela remota, como fração da altura da janela. */
 		maxHeight?: number;
+		/** A janela ocupa a altura que sobra até o rodapé da folha, em vez de `maxHeight`. */
+		fit?: boolean;
 		/** Inscrição dona do browser; o servidor mostra a sessão dela. */
 		applicationId?: string;
 		/** Saída de emergência quando a página remota não abre: a vaga no site de origem. */
@@ -51,7 +54,7 @@
 	let masked = $state(false);
 	let urlOpen = $state(false);
 	let url = $state('');
-	let ripples = $state<{ id: number; x: number; y: number }[]>([]);
+	let marks = $state<{ id: number; x: number; y: number }[]>([]);
 
 	const canControl = $derived(mode === 'control' && remote?.controller === 'user');
 	const ratio = $derived.by(() => {
@@ -61,7 +64,32 @@
 	// A página remota ocupa a largura toda (dá para ler e tocar); o que não cabe
 	// na altura fica fora da janela e aparece arrastando.
 	const fullHeight = $derived(boxWidth * ratio);
-	const screenHeight = $derived(Math.min(viewportHeight * maxHeight, fullHeight));
+	let screenEl = $state<HTMLElement>();
+	let available = $state(0);
+	const screenHeight = $derived(
+		fit && available > 0
+			? Math.min(fullHeight, Math.max(220, available))
+			: Math.min(viewportHeight * maxHeight, fullHeight)
+	);
+
+	// Nada da janela pode ficar sob o rodapé da folha: mede o espaço até ele.
+	function measure() {
+		if (!screenEl) return;
+		const body = screenEl.closest<HTMLElement>('[data-sheet-body]');
+		const limit = body ? body.getBoundingClientRect().bottom : window.innerHeight;
+		const top = screenEl.getBoundingClientRect().top + (body?.scrollTop ?? 0);
+		available = Math.floor(limit - top - 12);
+	}
+	$effect(() => {
+		void [boxWidth, canControl, notice, trouble, urlOpen];
+		if (!fit || !browser) return;
+		const raf = requestAnimationFrame(measure);
+		window.addEventListener('resize', measure);
+		return () => {
+			cancelAnimationFrame(raf);
+			window.removeEventListener('resize', measure);
+		};
+	});
 	const maxPan = $derived(Math.max(0, fullHeight - screenHeight));
 	let pan = $state(0);
 	$effect(() => {
@@ -209,6 +237,8 @@
 	let lastY = 0;
 	let pending = 0;
 	let scrolling = false;
+	let startedAt = 0;
+	let markId = 0;
 	let flushTimer: ReturnType<typeof setTimeout> | undefined;
 
 	function point(event: PointerEvent) {
@@ -231,6 +261,7 @@
 		startX = event.clientX;
 		startY = lastY = event.clientY;
 		scrolling = false;
+		startedAt = event.timeStamp;
 		pending = 0;
 		try {
 			(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -241,7 +272,13 @@
 
 	function move(event: PointerEvent) {
 		if (event.pointerId !== pointer) return;
-		if (!scrolling && Math.hypot(event.clientX - startX, event.clientY - startY) < 10) return;
+		if (!scrolling) {
+			// Folga para o dedo: toque curto e quase parado é sempre toque, nunca arrasto.
+			const moved = Math.hypot(event.clientX - startX, event.clientY - startY);
+			const quick = event.timeStamp - startedAt < 180;
+			if (moved < (quick ? 28 : 14)) return;
+			lastY = event.clientY;
+		}
 		scrolling = true;
 		const delta = lastY - event.clientY;
 		lastY = event.clientY;
@@ -266,9 +303,17 @@
 		if (scrolling || !canControl) return;
 		const at = point(event);
 		send({ type: 'tap', x: at.x, y: at.y });
-		const ripple = { id: Date.now(), x: at.px, y: at.py };
-		ripples = [...ripples, ripple];
-		setTimeout(() => (ripples = ripples.filter((r) => r !== ripple)), 450);
+		// O marcador é desenhado a partir das coordenadas REMOTAS enviadas, convertidas
+		// de volta para a tela: mostra onde o toque caiu de verdade na página.
+		const size = remote?.viewport ?? frame;
+		if (!size) return;
+		const id = (markId += 1);
+		marks = [
+			...marks,
+			{ id, x: (at.x / size.width) * boxWidth, y: (at.y / size.height) * fullHeight - pan }
+		];
+		// Por id: os itens do estado são proxies, comparar por identidade nunca casa.
+		setTimeout(() => (marks = marks.filter((m) => m.id !== id)), 1100);
 	}
 
 	function submitText(event: SubmitEvent) {
@@ -294,6 +339,101 @@
 </script>
 
 <div class="w-full" bind:clientWidth={boxWidth}>
+	{#if shortcuts && mode === 'control'}
+		<div class="mb-2 flex flex-wrap gap-2">
+			<button
+				type="button"
+				class="chip"
+				disabled={opening}
+				onclick={() => open('https://www.linkedin.com/login')}
+			>
+				<SourceIcon source="linkedin" />
+				LinkedIn
+				{#if remote?.accounts.linkedin}<span class="text-primary"
+						><Icon name="check" size={16} stroke={2.4} /></span
+					>{/if}
+			</button>
+			<button
+				type="button"
+				class="chip"
+				disabled={opening}
+				onclick={() => open('https://www.glassdoor.com.br/profile/login_input.htm')}
+			>
+				<SourceIcon source="glassdoor" />
+				Glassdoor
+				{#if remote?.accounts.glassdoor}<span class="text-primary"
+						><Icon name="check" size={16} stroke={2.4} /></span
+					>{/if}
+			</button>
+			<button
+				type="button"
+				class="chip"
+				aria-pressed={urlOpen}
+				onclick={() => (urlOpen = !urlOpen)}
+			>
+				<Icon name="globe" size={18} />
+				Outro site
+			</button>
+		</div>
+		{#if urlOpen}
+			<form
+				class="mb-2 flex gap-2"
+				onsubmit={(event) => {
+					event.preventDefault();
+					open(url);
+				}}
+			>
+				<input
+					class="field"
+					type="url"
+					inputmode="url"
+					autocapitalize="none"
+					spellcheck="false"
+					aria-label="Endereço do site"
+					placeholder="exemplo.com/vagas"
+					bind:value={url}
+				/>
+				<button type="submit" class="btn shrink-0" disabled={opening || !url.trim()}>Abrir</button>
+			</form>
+		{/if}
+	{/if}
+
+	{#if canControl}
+		<!-- Teclado: o texto digitado aqui vai para o campo em foco na página remota -->
+		<form class="mb-2 flex gap-2" onsubmit={submitText}>
+			<label for="{id}-text" class="sr-only">Texto para digitar na página</label>
+			<div class="relative min-w-0 flex-1">
+				<input
+					id="{id}-text"
+					class="field pr-12"
+					type={masked ? 'password' : 'text'}
+					autocapitalize="none"
+					autocomplete="off"
+					autocorrect="off"
+					spellcheck="false"
+					enterkeyhint="send"
+					placeholder="Toque num campo e digite aqui"
+					bind:value={text}
+				/>
+				<button
+					type="button"
+					class="absolute top-0.5 right-0.5 grid size-11 place-items-center rounded-sm {masked
+						? 'text-primary-deep'
+						: 'text-ink-soft'}"
+					aria-label={masked ? 'Mostrar o que digito' : 'Ocultar o que digito (senhas)'}
+					aria-pressed={masked}
+					onclick={() => (masked = !masked)}
+				>
+					<Icon name="eye" size={20} />
+				</button>
+			</div>
+			<button type="submit" class="btn shrink-0 px-4" disabled={!text}>
+				<Icon name="keyboard" size={20} />
+				Digitar
+			</button>
+		</form>
+	{/if}
+
 	<!-- Barra: quem dirige, endereço e navegação -->
 	<div class="flex min-h-11 items-center gap-1 rounded-t-md bg-ink py-1 pr-1 pl-3 text-paper">
 		<span
@@ -335,6 +475,7 @@
 	<!-- Tela remota -->
 	<div class="rounded-b-md border border-t-0 border-line">
 		<div
+			bind:this={screenEl}
 			class="screen relative w-full overflow-hidden rounded-b-md bg-paper"
 			class:control={canControl}
 			class:pannable={maxPan > 0}
@@ -393,17 +534,30 @@
 						{#if mode === 'watch'}
 							O browser aparece aqui quando o agente abrir a página da vaga.
 						{:else if shortcuts}
-							Escolha um site abaixo para abrir.
+							Escolha um site acima para abrir.
 						{:else}
 							Abrindo a página…
 						{/if}
 					</p>
 				</div>
 			{/if}
-			{#each ripples as ripple (ripple.id)}
-				<span class="ripple" style="left: {ripple.x}px; top: {ripple.y}px" aria-hidden="true"
-				></span>
+			{#each marks as mark (mark.id)}
+				<span class="mark" style="left: {mark.x}px; top: {mark.y}px" aria-hidden="true"></span>
 			{/each}
+			{#if frame && maxPan > 0}
+				<!-- Há mais página do que cabe na janela: trilho à direita e aviso embaixo. -->
+				<span
+					class="thumb"
+					style="height: {(screenHeight / fullHeight) * 100}%; top: {(pan / fullHeight) * 100}%"
+					aria-hidden="true"
+				></span>
+				{#if pan > 2}<span class="edge edge-top" aria-hidden="true"></span>{/if}
+				{#if pan < maxPan - 2}
+					<span class="edge edge-bottom" aria-hidden="true">
+						<span class="more"><Icon name="down" size={14} /> Arraste para ver o resto</span>
+					</span>
+				{/if}
+			{/if}
 			{#if opening}
 				<div class="absolute inset-0 grid place-items-center bg-paper/70 text-sm font-medium">
 					Abrindo…
@@ -417,101 +571,8 @@
 	{/if}
 
 	{#if mode === 'control'}
-		{#if shortcuts}
-			<div class="mt-3 flex flex-wrap gap-2">
-				<button
-					type="button"
-					class="chip"
-					disabled={opening}
-					onclick={() => open('https://www.linkedin.com/login')}
-				>
-					<SourceIcon source="linkedin" />
-					LinkedIn
-					{#if remote?.accounts.linkedin}<span class="text-primary"
-							><Icon name="check" size={16} stroke={2.4} /></span
-						>{/if}
-				</button>
-				<button
-					type="button"
-					class="chip"
-					disabled={opening}
-					onclick={() => open('https://www.glassdoor.com.br/profile/login_input.htm')}
-				>
-					<SourceIcon source="glassdoor" />
-					Glassdoor
-					{#if remote?.accounts.glassdoor}<span class="text-primary"
-							><Icon name="check" size={16} stroke={2.4} /></span
-						>{/if}
-				</button>
-				<button
-					type="button"
-					class="chip"
-					aria-pressed={urlOpen}
-					onclick={() => (urlOpen = !urlOpen)}
-				>
-					<Icon name="globe" size={18} />
-					Outro site
-				</button>
-			</div>
-			{#if urlOpen}
-				<form
-					class="mt-2 flex gap-2"
-					onsubmit={(event) => {
-						event.preventDefault();
-						open(url);
-					}}
-				>
-					<input
-						class="field"
-						type="url"
-						inputmode="url"
-						autocapitalize="none"
-						spellcheck="false"
-						aria-label="Endereço do site"
-						placeholder="exemplo.com/vagas"
-						bind:value={url}
-					/>
-					<button type="submit" class="btn shrink-0" disabled={opening || !url.trim()}>Abrir</button
-					>
-				</form>
-			{/if}
-		{/if}
-
 		{#if canControl}
-			<!-- Teclado: o texto digitado aqui vai para o campo em foco na página remota -->
-			<form class="mt-3 flex gap-2" onsubmit={submitText}>
-				<label for="{id}-text" class="sr-only">Texto para digitar na página</label>
-				<div class="relative min-w-0 flex-1">
-					<input
-						id="{id}-text"
-						class="field pr-12"
-						type={masked ? 'password' : 'text'}
-						autocapitalize="none"
-						autocomplete="off"
-						autocorrect="off"
-						spellcheck="false"
-						enterkeyhint="send"
-						placeholder="Toque num campo e digite aqui"
-						bind:value={text}
-					/>
-					<button
-						type="button"
-						class="absolute top-0.5 right-0.5 grid size-11 place-items-center rounded-sm {masked
-							? 'text-primary-deep'
-							: 'text-ink-soft'}"
-						aria-label={masked ? 'Mostrar o que digito' : 'Ocultar o que digito (senhas)'}
-						aria-pressed={masked}
-						onclick={() => (masked = !masked)}
-					>
-						<Icon name="eye" size={20} />
-					</button>
-				</div>
-				<button type="submit" class="btn shrink-0 px-4" disabled={!text}>
-					<Icon name="keyboard" size={20} />
-					Digitar
-				</button>
-			</form>
-			<div class="mt-2 flex gap-2">
+			<div class="mt-3 flex gap-2">
 				{#each [['Enter', 'Enter'], ['Tab', 'Tab'], ['Backspace', 'Apagar']] as [key, label] (key)}
 					<button
 						type="button"
@@ -547,25 +608,68 @@
 			transform: rotate(360deg);
 		}
 	}
-	.ripple {
+	.mark {
 		position: absolute;
-		width: 36px;
-		height: 36px;
-		margin: -18px 0 0 -18px;
+		width: 44px;
+		height: 44px;
+		margin: -22px 0 0 -22px;
 		border-radius: 50%;
-		background: rgba(116, 70, 196, 0.35);
-		box-shadow: 0 0 0 2px var(--color-primary);
+		border: 2px solid var(--color-primary);
+		background:
+			radial-gradient(circle, var(--color-primary) 0 4px, transparent 5px), rgba(116, 70, 196, 0.18);
 		pointer-events: none;
-		animation: ripple 450ms ease-out forwards;
+		animation: mark 1100ms ease-out forwards;
 	}
-	@keyframes ripple {
-		from {
-			transform: scale(0.4);
+	@keyframes mark {
+		0% {
+			transform: scale(0.5);
 			opacity: 1;
 		}
-		to {
-			transform: scale(1.4);
+		25% {
+			transform: scale(1);
+			opacity: 1;
+		}
+		100% {
+			transform: scale(1);
 			opacity: 0;
 		}
+	}
+	.thumb {
+		position: absolute;
+		right: 3px;
+		width: 4px;
+		min-height: 24px;
+		border-radius: 2px;
+		background: rgba(34, 27, 43, 0.45);
+		pointer-events: none;
+	}
+	.edge {
+		position: absolute;
+		inset-inline: 0;
+		height: 44px;
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		pointer-events: none;
+	}
+	.edge-top {
+		top: 0;
+		background: linear-gradient(rgba(34, 27, 43, 0.16), transparent);
+	}
+	.edge-bottom {
+		bottom: 0;
+		padding-bottom: 6px;
+		background: linear-gradient(transparent, rgba(34, 27, 43, 0.22));
+	}
+	.more {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 4px 10px;
+		border-radius: var(--radius-sm);
+		background: var(--color-ink);
+		color: var(--color-paper);
+		font-size: 0.75rem;
+		font-weight: 500;
 	}
 </style>

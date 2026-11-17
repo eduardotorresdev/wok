@@ -32,9 +32,10 @@
 	title="Conectar contas"
 	description="As candidaturas saem da sua conta: entre uma vez neste browser e o agente reaproveita a sessão nas próximas inscrições."
 	tall
+	compact={!!last?.open}
 >
 	{#if open}
-		<BrowserView mode="control" shortcuts maxHeight={0.46} onstate={(state) => (last = state)} />
+		<BrowserView mode="control" shortcuts fit onstate={(state) => (last = state)} />
 	{/if}
 	{#snippet footer()}
 		<button type="button" class="btn w-full" onclick={() => (open = false)}>Pronto</button>

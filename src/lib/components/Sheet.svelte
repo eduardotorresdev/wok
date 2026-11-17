@@ -9,6 +9,7 @@
 		title,
 		description,
 		tall = false,
+		compact = false,
 		children,
 		footer
 	}: {
@@ -16,6 +17,8 @@
 		title: string;
 		description?: string;
 		tall?: boolean;
+		/** Cabeçalho de uma linha, para sobrar altura ao conteúdo. */
+		compact?: boolean;
 		children: Snippet;
 		footer?: Snippet;
 	} = $props();
@@ -37,8 +40,10 @@
 		>
 			<div class="flex shrink-0 items-start gap-2 pt-2 pr-2 pl-5">
 				<div class="min-w-0 flex-1 pt-3">
-					<Dialog.Title class="t-headline text-balance">{title}</Dialog.Title>
-					{#if description}
+					<Dialog.Title class={compact ? 't-title truncate' : 't-headline text-balance'}
+						>{title}</Dialog.Title
+					>
+					{#if description && !compact}
 						<Dialog.Description class="mt-1 text-[0.9375rem] text-ink-soft"
 							>{description}</Dialog.Description
 						>
@@ -48,7 +53,12 @@
 					<Icon name="x" />
 				</Dialog.Close>
 			</div>
-			<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-4 pb-6">
+			<div
+				class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-6 {compact
+					? 'pt-1'
+					: 'pt-4'}"
+				data-sheet-body
+			>
 				{@render children()}
 			</div>
 			{#if footer}

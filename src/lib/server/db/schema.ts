@@ -78,6 +78,9 @@ export const application = sqliteTable(
 		tailoredLatex: text('tailored_latex'),
 		tailoredPdfPath: text('tailored_pdf_path'),
 		lastMessage: text('last_message'),
+		/** Set while status is needs_user: what the user has to do. */
+		needsKind: text('needs_kind').$type<'question' | 'browser'>(),
+		pendingQuestion: text('pending_question'),
 		createdAt: integer('created_at').notNull(),
 		updatedAt: integer('updated_at').notNull()
 	},
@@ -102,3 +105,55 @@ export const searchRun = sqliteTable('search_run', {
 	startedAt: integer('started_at').notNull(),
 	finishedAt: integer('finished_at')
 });
+
+export interface SalaryRange {
+	min: number | null;
+	max: number | null;
+}
+
+export interface ProfileData {
+	fullName: string;
+	phone: string;
+	city: string;
+	country: string;
+	linkedinUrl: string;
+	portfolioLinks: string[];
+	salary: {
+		currency: string;
+		preferredRegime: 'clt' | 'pj' | 'outro' | '';
+		/** Monthly expectation per hiring regime; both null means "not informed". */
+		clt: SalaryRange;
+		pj: SalaryRange;
+	};
+	availability: string;
+	workAuthorization: { country: string; authorized: boolean; note: string }[];
+	workModel: 'remote' | 'hybrid' | 'onsite' | 'any';
+	willingToRelocate: boolean;
+	languages: { language: string; level: string }[];
+	professionalRegistration: { number: string; state: string; status: string };
+	certifications: { name: string; validUntil: string }[];
+	shifts: string[];
+	/** What must never appear in a résumé or form (client names, confidential figures). */
+	confidential: string[];
+}
+
+export const profile = sqliteTable('profile', {
+	userId: text('user_id').primaryKey(),
+	data: text('data', { mode: 'json' }).$type<ProfileData>().notNull(),
+	updatedAt: integer('updated_at').notNull()
+});
+
+/** Answers the user confirmed once and the applier may reuse on later forms. */
+export const confirmedAnswer = sqliteTable(
+	'confirmed_answer',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id').notNull(),
+		/** Lower-cased, accent- and punctuation-free form of the question, for matching. */
+		questionKey: text('question_key').notNull(),
+		question: text('question').notNull(),
+		answer: text('answer').notNull(),
+		updatedAt: integer('updated_at').notNull()
+	},
+	(t) => [uniqueIndex('confirmed_answer_user_key').on(t.userId, t.questionKey)]
+);

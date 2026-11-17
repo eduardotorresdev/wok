@@ -13,6 +13,9 @@ function createAuth() {
 		baseURL: config.baseUrl,
 		secret: config.authSecret || undefined,
 		trustedOrigins: [config.baseUrl],
+		// Behind Cloudflare Tunnel the socket address is always the tunnel; without
+		// this every visitor would share one rate-limit bucket.
+		advanced: { ipAddress: { ipAddressHeaders: ['cf-connecting-ip', 'x-forwarded-for'] } },
 		session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24 },
 		plugins: [
 			magicLink({

@@ -1,7 +1,15 @@
 import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/svelte-query';
 import { browser } from '$app/env';
 import { api } from './api.ts';
-import type { Application, Job, Preferences, Resume, SwipeDirection } from './types.ts';
+import type {
+	Application,
+	Job,
+	Preferences,
+	Profile,
+	Resume,
+	SavedAnswer,
+	SwipeDirection
+} from './types.ts';
 
 export const keys = {
 	feed: ['jobs', 'feed'] as const,
@@ -10,6 +18,8 @@ export const keys = {
 	application: (id: string) => ['applications', id] as const,
 	preferences: ['preferences'] as const,
 	resume: ['resume'] as const,
+	profile: ['profile'] as const,
+	answers: ['profile', 'answers'] as const,
 	browser: ['browser', 'state'] as const
 };
 
@@ -42,12 +52,113 @@ export const applicationsQuery = () =>
 		refetchInterval: (query) => (query.state.data?.some(isLive) ? 3000 : 20_000)
 	});
 
-export const applicationQuery = (id: string) =>
+/** `streaming` desliga o polling quando o SSE da inscrição está conectado. */
+export const applicationQuery = (id: string, streaming = false) =>
 	queryOptions({
 		queryKey: keys.application(id),
 		queryFn: () => api.applications.get(id),
-		enabled: browser && !!id
+		enabled: browser && !!id,
+		refetchInterval: (query) =>
+			!streaming && query.state.data && isLive(query.state.data) ? 2500 : false
 	});
+
+export const profileQuery = () =>
+	queryOptions({
+		queryKey: keys.profile,
+		queryFn: api.profile.get,
+		enabled: browser,
+		staleTime: 60_000
+	});
+
+export const answersQuery = () =>
+	queryOptions({ queryKey: keys.answers, queryFn: api.profile.answers, enabled: browser });
+
+export const saveProfileMutation = (client: QueryClient) =>
+	mutationOptions({
+		mutationKey: ['profile', 'save'],
+		mutationFn: (profile: Profile) => api.profile.save(profile),
+		onMutate: async (profile) => {
+			await client.cancelQueries({ queryKey: keys.profile, exact: true });
+			const previous = client.getQueryData<Profile>(keys.profile);
+			client.setQueryData<Profile>(keys.profile, profile);
+			return { previous };
+		},
+		onError: (_error, _profile, context) => {
+			client.setQueryData(keys.profile, context?.previous);
+		},
+		onSuccess: (saved) => {
+			if (saved) client.setQueryData(keys.profile, saved);
+		}
+	});
+
+export const deleteAnswerMutation = (client: QueryClient) =>
+	mutationOptions({
+		mutationKey: ['profile', 'answers', 'delete'],
+		mutationFn: (id: string) => api.profile.deleteAnswer(id),
+		onMutate: async (id) => {
+			await client.cancelQueries({ queryKey: keys.answers });
+			const previous = client.getQueryData<SavedAnswer[]>(keys.answers);
+			client.setQueryData<SavedAnswer[]>(keys.answers, (old) => old?.filter((a) => a.id !== id));
+			return { previous };
+		},
+		onError: (_error, _id, context) => {
+			client.setQueryData(keys.answers, context?.previous);
+		},
+		onSettled: () => client.invalidateQueries({ queryKey: keys.answers })
+	});
+
+/** Grava uma inscrição nos dois caches (lista e detalhe), preservando os passos já vistos. */
+export function putApplication(client: QueryClient, app: Application) {
+	client.setQueryData<Application[]>(keys.applications, (old) =>
+		old?.map((a) => (a.id === app.id ? { ...a, ...app, steps: undefined } : a))
+	);
+	client.setQueryData<Application>(keys.application(app.id), (old) => ({
+		...old,
+		...app,
+		steps: app.steps ?? old?.steps
+	}));
+}
+
+/** Responder a pergunta ou continuar: a inscrição volta para a fila na hora. */
+const requeue = (
+	client: QueryClient,
+	key: string,
+	run: (id: string, answer: string) => Promise<Application>
+) =>
+	mutationOptions({
+		mutationKey: ['applications', key],
+		mutationFn: ({ id, answer = '' }: { id: string; answer?: string }) => run(id, answer),
+		onMutate: async ({ id }) => {
+			await client.cancelQueries({ queryKey: keys.applications });
+			const previous = client
+				.getQueryData<Application[]>(keys.applications)
+				?.find((a) => a.id === id);
+			if (previous) {
+				putApplication(client, {
+					...previous,
+					status: 'queued',
+					needsKind: null,
+					pendingQuestion: null,
+					lastMessage: 'Retomando a inscrição.',
+					updatedAt: new Date().toISOString()
+				});
+			}
+			return { previous };
+		},
+		onError: (_error, _vars, context) => {
+			if (context?.previous) putApplication(client, context.previous);
+		},
+		onSuccess: (app) => {
+			if (app) putApplication(client, app);
+		},
+		onSettled: () => client.invalidateQueries({ queryKey: keys.applications })
+	});
+
+export const answerMutation = (client: QueryClient) =>
+	requeue(client, 'answer', (id, answer) => api.applications.answer(id, answer));
+
+export const resumeApplicationMutation = (client: QueryClient) =>
+	requeue(client, 'resume', (id) => api.applications.resume(id));
 
 export const preferencesQuery = () =>
 	queryOptions({
@@ -89,6 +200,9 @@ export const swipeMutation = (client: QueryClient) =>
 									status: 'queued',
 									tailoredPdfUrl: null,
 									lastMessage: 'Na fila do agente',
+									needsKind: null,
+									pendingQuestion: null,
+									createdAt: new Date().toISOString(),
 									updatedAt: new Date().toISOString()
 								},
 								...old

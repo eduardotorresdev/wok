@@ -13,11 +13,10 @@
 	}[] = [
 		{ href: '/(app)', path: '/', label: 'Vagas', icon: 'cards' },
 		{ href: '/(app)/inscricoes', path: '/inscricoes', label: 'Inscrições', icon: 'send' },
-		{ href: '/(app)/browser', path: '/browser', label: 'Browser', icon: 'globe' },
 		{
 			href: '/(app)/curriculo',
 			path: '/curriculo',
-			label: 'Currículo',
+			label: 'Perfil',
 			icon: 'doc',
 			also: '/ajustes'
 		}
@@ -34,7 +33,7 @@
 	aria-label="Principal"
 	class="shrink-0 border-t border-line bg-paper pb-[env(safe-area-inset-bottom)]"
 >
-	<ul class="mx-auto grid max-w-md grid-cols-4">
+	<ul class="mx-auto grid max-w-md grid-cols-3">
 		{#each items as item (item.href)}
 			{@const active = isActive(item)}
 			<li>

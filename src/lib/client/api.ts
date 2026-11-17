@@ -6,7 +6,9 @@ import type {
 	CompileResult,
 	Job,
 	Preferences,
+	Profile,
 	Resume,
+	SavedAnswer,
 	SearchRun,
 	SwipeDirection
 } from './types.ts';
@@ -105,7 +107,19 @@ export const api = {
 			);
 			return Array.isArray(data) ? data : (data?.applications ?? []);
 		},
-		get: (id: string) => call<Application>('GET', `/api/applications/${encodeURIComponent(id)}`)
+		get: (id: string) => call<Application>('GET', `/api/applications/${encodeURIComponent(id)}`),
+		answer: (id: string, answer: string) =>
+			call<Application>('POST', `/api/applications/${encodeURIComponent(id)}/answer`, { answer }),
+		resume: (id: string) =>
+			call<Application>('POST', `/api/applications/${encodeURIComponent(id)}/resume`, {})
+	},
+	profile: {
+		get: () => call<Profile>('GET', '/api/profile'),
+		save: ({ updatedAt: _updatedAt, ...profile }: Profile) =>
+			call<Profile>('PUT', '/api/profile', profile),
+		answers: () => call<SavedAnswer[]>('GET', '/api/profile/answers'),
+		deleteAnswer: (id: string) =>
+			call<SavedAnswer[]>('DELETE', `/api/profile/answers/${encodeURIComponent(id)}`)
 	},
 	browser: {
 		state: () => call<BrowserState>('GET', '/api/browser/state'),

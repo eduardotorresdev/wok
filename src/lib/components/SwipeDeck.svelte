@@ -22,12 +22,10 @@
 	let {
 		jobs,
 		onswipe,
-		onopen,
 		allow = () => true
 	}: {
 		jobs: Job[];
 		onswipe: (job: Job, direction: SwipeDirection) => void;
-		onopen: (job: Job) => void;
 		/** Veto antes de confirmar (ex.: aviso único da primeira inscrição). */
 		allow?: (job: Job, direction: SwipeDirection) => boolean;
 	} = $props();
@@ -38,6 +36,8 @@
 	let grab = $state(1);
 	let dragging = $state(false);
 	let ghosts = $state.raw<Ghost[]>([]);
+	/** Card virado para o verso (detalhes). */
+	let flippedId = $state<string | null>(null);
 
 	// Um card em voo já saiu da pilha, mesmo antes de o cache confirmar.
 	const stack = $derived(
@@ -149,7 +149,7 @@
 	function up(event: PointerEvent, job: Job) {
 		if (event.pointerId !== pointer) return;
 		pointer = null;
-		if (!moved) return; // toque simples: o click nativo abre os detalhes
+		if (!moved) return; // toque simples: o click nativo vira o card
 		const { vx, vy } = velocity(event.timeStamp);
 		const flick = Math.abs(vx) > FLICK && Math.sign(vx) === Math.sign(dx) && Math.abs(dx) > 28;
 		if (Math.abs(dx) > threshold || flick) {
@@ -168,13 +168,12 @@
 		reset();
 	}
 
-	function click(event: MouseEvent, job: Job) {
-		if (swallowClick) {
-			swallowClick = false;
-			event.preventDefault();
-			return;
-		}
-		onopen(job);
+	// Um arrasto termina em click; esse click não pode virar o card.
+	function clickCapture(event: MouseEvent) {
+		if (!swallowClick) return;
+		swallowClick = false;
+		event.preventDefault();
+		event.stopPropagation();
 	}
 
 	const rotation = (x: number) => (x / width) * 13 * grab;
@@ -206,6 +205,7 @@
 		<div
 			class="slot"
 			class:top={index === 0}
+			class:flipped={flippedId === job.id}
 			class:dragging
 			style="transform: {pose(index)}; z-index: {3 - index}"
 			inert={index > 0}
@@ -216,9 +216,15 @@
 			onpointermove={index === 0 ? move : undefined}
 			onpointerup={index === 0 ? (e) => up(e, job) : undefined}
 			onpointercancel={index === 0 ? cancel : undefined}
-			onclick={index === 0 ? (e) => click(e, job) : undefined}
+			onclickcapture={index === 0 ? clickCapture : undefined}
 		>
-			<JobCard {job} lean={index === 0 ? lean : 0} interactive={index === 0} />
+			<JobCard
+				{job}
+				lean={index === 0 ? lean : 0}
+				interactive={index === 0}
+				flipped={index === 0 && flippedId === job.id}
+				onflip={(flipped) => (flippedId = flipped ? job.id : null)}
+			/>
 		</div>
 	{/each}
 
@@ -249,14 +255,15 @@
 		touch-action: none;
 		cursor: grab;
 	}
+	/* No verso a rolagem vertical é do navegador; o arrasto lateral continua nosso. */
+	.slot.top.flipped {
+		touch-action: pan-y;
+	}
 	.slot.top.dragging {
 		cursor: grabbing;
 	}
 	.slot.top.dragging :global(.paper) {
 		box-shadow: var(--shadow-lifted);
-	}
-	.slot :global(.paper) {
-		transition: box-shadow 200ms;
 	}
 	.ghost {
 		z-index: 5;

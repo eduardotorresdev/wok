@@ -4,12 +4,12 @@
 import { ApiError } from './api.ts';
 import type {
 	Application,
-	ApplicationEvent,
 	ApplicationStatus,
 	Job,
 	Preferences,
 	Resume,
 	SearchRun,
+	Step,
 	SwipeDirection
 } from './types.ts';
 
@@ -119,7 +119,7 @@ interface Store {
 	resume: Resume;
 	preferences: Preferences;
 	swiped: Record<string, SwipeDirection>;
-	apps: { id: string; jobId: string; createdAt: number }[];
+	apps: { id: string; jobId: string; createdAt: number; forceSubmit?: boolean }[];
 	collectingUntil: number;
 }
 
@@ -191,21 +191,35 @@ function toApplication(entry: Store['apps'][number], index: number): Application
 	const job = JOBS.find((j) => j.id === entry.jobId);
 	if (!job) return null;
 	const elapsed = (Date.now() - entry.createdAt) / 1000;
-	const steps = [...STEPS, finalStep(index, job)].filter((s) => s.after <= elapsed);
-	const last = steps[steps.length - 1];
-	const events: ApplicationEvent[] = steps.map((s) => ({
-		at: new Date(entry.createdAt + s.after * 1000).toISOString(),
+	const all = [
+		...STEPS,
+		entry.forceSubmit
+			? { after: 20, status: 'submitted' as const, message: 'Candidatura enviada' }
+			: finalStep(index, job)
+	];
+	const visible = all.filter((s) => s.after <= elapsed);
+	const last = visible[visible.length - 1];
+	const steps: Step[] = visible.map((s, i) => ({
+		id: i + 1,
+		kind: s.status,
 		message: s.message,
-		status: s.status
+		data: null,
+		createdAt: new Date(entry.createdAt + s.after * 1000).toISOString()
 	}));
+	const question = last.status === 'needs_user' && index % 4 === 2;
 	return {
 		id: entry.id,
 		job,
 		status: last.status,
-		tailoredPdfUrl: elapsed >= 10 ? '/mock/curriculo.pdf' : null,
-		lastMessage: last.message,
-		updatedAt: events[events.length - 1].at,
-		events
+		tailoredPdfUrl: null,
+		lastMessage: question
+			? 'O formulário tem uma pergunta que só você sabe responder.'
+			: last.message,
+		needsKind: last.status === 'needs_user' ? (question ? 'question' : 'browser') : null,
+		pendingQuestion: question ? 'Você tem disponibilidade para viajar até 20% do tempo?' : null,
+		createdAt: new Date(entry.createdAt).toISOString(),
+		updatedAt: steps[steps.length - 1].createdAt,
+		steps
 	};
 }
 
@@ -271,6 +285,16 @@ export async function mock(method: string, path: string, body: unknown): Promise
 		const found = applications().find((a) => a.id === decodeURIComponent(app[1]));
 		if (!found) throw new ApiError(404, 'not_found', 'Candidatura não encontrada.');
 		return found;
+	}
+	const resume = route.match(/^POST \/api\/applications\/([^/]+)\/(answer|resume)$/);
+	if (resume) {
+		const entry = s.apps.find((a) => a.id === decodeURIComponent(resume[1]));
+		if (!entry) throw new ApiError(404, 'application_not_found', 'Inscrição não encontrada.');
+		// Volta para o trecho "inscrevendo" e termina como enviada.
+		entry.createdAt = Date.now() - 12_000;
+		s.apps = s.apps.map((a) => (a === entry ? { ...a, forceSubmit: true } : a));
+		save();
+		return applications().find((a) => a.id === entry.id);
 	}
 	if (route === 'GET /api/browser/state') return { open: false, url: null };
 	if (route === 'POST /api/browser/open') return { open: true, url: input.url };

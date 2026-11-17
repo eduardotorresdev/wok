@@ -4,6 +4,8 @@ export interface Job {
 	id: string;
 	title: string;
 	company: string;
+	/** Logo da empresa, quando a coleta trouxer. */
+	companyLogo?: string | null;
 	location: string | null;
 	source: JobSource;
 	url: string;
@@ -28,10 +30,12 @@ export type SwipeDirection = 'apply' | 'skip';
 export type ApplicationStatus =
 	'queued' | 'tailoring' | 'applying' | 'needs_user' | 'submitted' | 'failed';
 
-export interface ApplicationEvent {
-	at: string;
+export interface Step {
+	id: number;
+	kind: string;
 	message: string;
-	status?: ApplicationStatus;
+	data: Record<string, unknown> | null;
+	createdAt: string;
 }
 
 export interface Application {
@@ -40,8 +44,12 @@ export interface Application {
 	status: ApplicationStatus;
 	tailoredPdfUrl: string | null;
 	lastMessage: string | null;
+	/** Em needs_user: 'question' (responder) ou 'browser' (agir no browser e continuar). */
+	needsKind: 'question' | 'browser' | null;
+	pendingQuestion: string | null;
+	createdAt: string;
 	updatedAt: string;
-	events?: ApplicationEvent[];
+	steps?: Step[];
 }
 
 export interface Preferences {
@@ -51,6 +59,50 @@ export interface Preferences {
 	area: string;
 	seniority: string;
 	updatedAt?: string | null;
+}
+
+export interface Profile {
+	fullName: string;
+	phone: string;
+	city: string;
+	country: string;
+	linkedinUrl: string;
+	portfolioUrl: string;
+	salary: {
+		min: number | null;
+		max: number | null;
+		currency: string;
+		regime: 'clt' | 'pj' | 'outro' | '';
+	};
+	availability: string;
+	workAuthorization: { country: string; authorized: boolean; note: string }[];
+	workModel: 'remote' | 'hybrid' | 'onsite' | 'any';
+	willingToRelocate: boolean;
+	languages: { language: string; level: string }[];
+	updatedAt?: string | null;
+}
+
+export const EMPTY_PROFILE: Profile = {
+	fullName: '',
+	phone: '',
+	city: '',
+	country: '',
+	linkedinUrl: '',
+	portfolioUrl: '',
+	salary: { min: null, max: null, currency: 'BRL', regime: '' },
+	availability: '',
+	workAuthorization: [],
+	workModel: 'any',
+	willingToRelocate: false,
+	languages: [],
+	updatedAt: null
+};
+
+export interface SavedAnswer {
+	id: string;
+	question: string;
+	answer: string;
+	updatedAt: string;
 }
 
 export interface Resume {

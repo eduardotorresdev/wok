@@ -13,7 +13,6 @@
 	import type { Job, SwipeDirection } from '#lib/client/types.ts';
 	import Brush from '#lib/components/Brush.svelte';
 	import Icon from '#lib/components/Icon.svelte';
-	import JobDetails from '#lib/components/JobDetails.svelte';
 	import Sheet from '#lib/components/Sheet.svelte';
 	import SwipeDeck from '#lib/components/SwipeDeck.svelte';
 	import { toast } from '#lib/components/Toast.svelte';
@@ -36,8 +35,6 @@
 	});
 
 	let deck = $state<ReturnType<typeof SwipeDeck>>();
-	let selected = $state<Job | null>(null);
-	let detailsOpen = $state(false);
 
 	// Aviso único antes da primeira inscrição.
 	const WARNED = 'wok:aviso-inscricao';
@@ -85,16 +82,6 @@
 				}
 			}
 		);
-	}
-
-	function open(job: Job) {
-		selected = job;
-		detailsOpen = true;
-	}
-
-	function decide(job: Job, direction: SwipeDirection) {
-		detailsOpen = false;
-		deck?.swipe(direction, job);
 	}
 
 	function searchMore() {
@@ -147,7 +134,7 @@
 
 		<div class="relative mx-auto min-h-0 w-full max-w-md flex-1 px-4 pt-2 pb-7">
 			{#if phase === 'ready'}
-				<SwipeDeck bind:this={deck} {jobs} {onswipe} onopen={open} {allow} />
+				<SwipeDeck bind:this={deck} {jobs} {onswipe} {allow} />
 			{:else}
 				<section class="paper flex h-full flex-col justify-center px-6 py-8" aria-live="polite">
 					{#if phase === 'loading'}
@@ -218,8 +205,6 @@
 		{/if}
 	</div>
 </div>
-
-<JobDetails job={selected} bind:open={detailsOpen} ondecide={decide} />
 
 <Sheet
 	bind:open={warnOpen}

@@ -49,7 +49,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS confirmed_answer_user_key ON confirmed_answer 
 // alters an existing table, so each one is added here when missing.
 const ADDED_COLUMNS: [table: string, column: string, type: string][] = [
 	['application', 'needs_kind', 'TEXT'],
-	['application', 'pending_question', 'TEXT']
+	['application', 'pending_question', 'TEXT'],
+	['job', 'company_logo', 'TEXT']
 ];
 
 function addMissingColumns(database: Database.Database) {

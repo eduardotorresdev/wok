@@ -61,6 +61,7 @@ export async function searchLinkedIn(query: SearchQuery, limit: number): Promise
 			externalId: id,
 			title,
 			company: str(it.companyName) ?? 'Empresa não informada',
+			companyLogo: str(it.companyLogo) ?? str(it.companyLogoUrl) ?? str(it.logoUrl),
 			location: str(it.location),
 			url,
 			applyUrl: str(it.applyUrl),
@@ -97,7 +98,7 @@ export async function searchGlassdoor(query: SearchQuery, limit: number): Promis
 		const title = str(it.title);
 		const url = str(it.seoUrl) ?? str(it.url);
 		if (!id || !title || !url) continue;
-		const employer = it.employer as { name?: string } | undefined;
+		const employer = it.employer as { name?: string; logoUrl?: string } | undefined;
 		const location = it.location as { name?: string } | undefined;
 		const age = typeof it.ageInDays === 'number' ? it.ageInDays : null;
 		jobs.push({
@@ -105,6 +106,7 @@ export async function searchGlassdoor(query: SearchQuery, limit: number): Promis
 			externalId: id,
 			title,
 			company: str(employer?.name) ?? 'Empresa não informada',
+			companyLogo: str(employer?.logoUrl),
 			location: str(location?.name),
 			url,
 			applyUrl: null,

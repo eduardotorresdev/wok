@@ -40,6 +40,7 @@ export const job = sqliteTable(
 		externalId: text('external_id').notNull(),
 		title: text('title').notNull(),
 		company: text('company').notNull(),
+		companyLogo: text('company_logo'),
 		location: text('location'),
 		url: text('url').notNull(),
 		applyUrl: text('apply_url'),

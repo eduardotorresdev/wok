@@ -6,6 +6,7 @@ export interface CollectedJob {
 	externalId: string;
 	title: string;
 	company: string;
+	companyLogo: string | null;
 	location: string | null;
 	url: string;
 	applyUrl: string | null;

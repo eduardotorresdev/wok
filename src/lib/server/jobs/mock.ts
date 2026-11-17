@@ -6,7 +6,7 @@ const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 export function mockJobs(terms: string[], location: string): CollectedJob[] {
 	const role = terms[0] || 'Pessoa Desenvolvedora';
 	const place = location || 'Brasil';
-	const base: Omit<CollectedJob, 'externalId' | 'url' | 'source'>[] = [
+	const base: Omit<CollectedJob, 'externalId' | 'url' | 'source' | 'companyLogo'>[] = [
 		{
 			title: `${role} Sênior`,
 			company: 'Aurora Pagamentos',
@@ -46,6 +46,7 @@ export function mockJobs(terms: string[], location: string): CollectedJob[] {
 	];
 	return base.map((j, i) => ({
 		...j,
+		companyLogo: null,
 		source: i % 2 === 0 ? 'linkedin' : 'glassdoor',
 		externalId: `mock-${i + 1}`,
 		url: `https://example.com/vagas/mock-${i + 1}`

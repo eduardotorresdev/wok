@@ -5,6 +5,7 @@ export interface JobDto {
 	id: string;
 	title: string;
 	company: string;
+	companyLogo: string | null;
 	location: string | null;
 	source: 'linkedin' | 'glassdoor';
 	url: string;
@@ -20,6 +21,7 @@ export function jobDto(row: typeof schema.job.$inferSelect): JobDto {
 		id: row.id,
 		title: row.title,
 		company: row.company,
+		companyLogo: row.companyLogo,
 		location: row.location,
 		source: row.source,
 		url: row.url,

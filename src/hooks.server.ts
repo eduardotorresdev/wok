@@ -3,11 +3,25 @@ import { redirect } from '@sveltejs/kit';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { building } from '$app/env';
 import { auth, migrateAuth } from '#lib/server/auth.ts';
+import { registerPipeline } from '#lib/server/agent/pipeline.ts';
+import { recoverQueue } from '#lib/server/applications/queue.ts';
+import { closeAll } from '#lib/server/browser/service.ts';
 import { apiError } from '#lib/server/http.ts';
+import { failOrphanRuns } from '#lib/server/jobs/search.ts';
 
 export const init: ServerInit = async () => {
 	if (building) return;
 	await migrateAuth();
+	registerPipeline();
+	// The dev server re-runs init on reload; recovery must happen once per process,
+	// or an application already running would be started a second time.
+	const once = globalThis as { __wokBooted?: boolean };
+	if (once.__wokBooted) return;
+	once.__wokBooted = true;
+	failOrphanRuns();
+	recoverQueue();
+	// adapter-node emits this on SIGTERM/SIGINT; Chromium must not outlive the server.
+	process.on('sveltekit:shutdown', () => void closeAll());
 };
 
 const PUBLIC_PREFIXES = ['/login', '/api/auth', '/api/health'];

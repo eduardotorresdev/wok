@@ -10,6 +10,10 @@ export interface CompileResult {
 	pages: number;
 	pdfPath: string | null;
 	log: string;
+	/** Text extracted from the PDF (pdftotext -layout); null when unavailable. */
+	text: string | null;
+	/** Problems a reader or an applicant-tracking parser would hit in the extracted text. */
+	textIssues: string[];
 }
 
 const MAX_LOG = 12_000;
@@ -45,6 +49,39 @@ async function countPages(pdfPath: string, log: string): Promise<number> {
 	// Last resort: page objects in an uncompressed PDF.
 	const raw = (await fs.readFile(pdfPath)).toString('latin1');
 	return (raw.match(/\/Type\s*\/Page(?![s])/g) ?? []).length;
+}
+
+async function extractText(pdfPath: string): Promise<string | null> {
+	const res = await run(
+		'pdftotext',
+		['-layout', '-enc', 'UTF-8', pdfPath, '-'],
+		path.dirname(pdfPath)
+	);
+	return res.missing || res.code !== 0 ? null : res.out;
+}
+
+function textIssues(text: string | null, log: string): string[] {
+	const issues: string[] = [];
+	if (text !== null) {
+		if (text.trim().length < 200) issues.push('Quase nenhum texto extraível do PDF.');
+		if (/\uFFFD/.test(text)) issues.push('Há caracteres ilegíveis (U+FFFD) no texto extraído.');
+		const ligatures = [...new Set(text.match(/[\uFB00-\uFB06]/g) ?? [])];
+		if (ligatures.length) {
+			issues.push(
+				`O texto extraído tem ligaduras tipográficas (${ligatures.join(' ')}) no lugar de letras separadas, o que quebra buscas por palavras como "traffic" ou "flows". Desative as ligaduras da fonte (com fontspec: Ligatures=NoCommon).`
+			);
+		}
+	}
+	const missing = [...new Set(log.match(/Missing character: There is no \S+/g) ?? [])];
+	if (missing.length) {
+		issues.push(
+			`Caracteres sem glifo na fonte, que somem do PDF: ${missing
+				.map((m) => m.replace('Missing character: There is no ', ''))
+				.slice(0, 8)
+				.join(' ')}`
+		);
+	}
+	return issues;
 }
 
 function tail(log: string) {
@@ -106,7 +143,9 @@ export async function compileLatex(
 			ok: false,
 			pages: 0,
 			pdfPath: null,
-			log: 'Nenhum compilador LaTeX encontrado no servidor (tectonic ou pdflatex).'
+			log: 'Nenhum compilador LaTeX encontrado no servidor (tectonic ou pdflatex).',
+			text: null,
+			textIssues: []
 		};
 	}
 
@@ -122,9 +161,17 @@ export async function compileLatex(
 		.then((s) => s.size > 0)
 		.catch(() => false);
 	if (res.code !== 0 || !exists) {
-		return { ok: false, pages: 0, pdfPath: null, log: tail(log) };
+		return { ok: false, pages: 0, pdfPath: null, log: tail(log), text: null, textIssues: [] };
 	}
-	return { ok: true, pages: await countPages(pdf, log), pdfPath: pdf, log: tail(log) };
+	const text = await extractText(pdf);
+	return {
+		ok: true,
+		pages: await countPages(pdf, log),
+		pdfPath: pdf,
+		log: tail(log),
+		text,
+		textIssues: textIssues(text, log)
+	};
 }
 
 export function hashLatex(latex: string) {

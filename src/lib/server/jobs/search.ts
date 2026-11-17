@@ -168,6 +168,7 @@ function store(userId: string, jobs: CollectedJob[]): string[] {
 				externalId: j.externalId,
 				title: j.title,
 				company: j.company,
+				companyLogo: j.companyLogo,
 				location: j.location,
 				url: j.url,
 				applyUrl: j.applyUrl,

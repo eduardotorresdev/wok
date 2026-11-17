@@ -33,6 +33,15 @@ export const config = {
 	get apifyToken() {
 		return privateEnv.APIFY_TOKEN || '';
 	},
+	/** Postings older than this many days are not collected. */
+	get jobsMaxAgeDays() {
+		const days = Number(privateEnv.JOBS_MAX_AGE_DAYS);
+		return Number.isFinite(days) && days >= 1 ? Math.floor(days) : 14;
+	},
+	/** When on, the applier fills everything but never presses the final submit. */
+	get applyDryRun() {
+		return ['1', 'true', 'yes'].includes((privateEnv.APPLY_DRY_RUN || '').toLowerCase());
+	},
 	get isProduction() {
 		return privateEnv.NODE_ENV === 'production';
 	}

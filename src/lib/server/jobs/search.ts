@@ -5,7 +5,9 @@ import { describeLlmError, hasLlm, structured } from '../agent/llm.ts';
 import { db, schema } from '../db/index.ts';
 import { getPreferences, type PreferencesDto } from '../preferences.ts';
 import { getResumeRow } from '../resume.ts';
-import { hasApify, searchGlassdoor, searchLinkedIn } from './apify.ts';
+import { config } from '../env.ts';
+import { hasApify, searchGlassdoor, searchLinkedIn, withinAge } from './apify.ts';
+import { feedCount } from './feed.ts';
 import { mockJobs } from './mock.ts';
 import type { CollectedJob, SearchQuery } from './types.ts';
 
@@ -112,15 +114,13 @@ Use os termos que a pessoa informou como ponto de partida e o currículo para es
 
 async function collect(queries: SearchQuery[], prefs: PreferencesDto) {
 	if (!hasApify()) {
-		return {
-			jobs: mockJobs(prefs.terms, prefs.locations[0] ?? ''),
-			errors: [] as string[],
-			mock: true
-		};
+		const jobs = mockJobs(prefs.terms, prefs.locations[0] ?? '');
+		return { jobs, collected: jobs.length, errors: [] as string[], mock: true };
 	}
+	const maxAge = config.jobsMaxAgeDays;
 	const tasks = queries.flatMap((q) => [
-		{ label: `LinkedIn "${q.keywords}"`, run: () => searchLinkedIn(q, PER_ACTOR_LIMIT) },
-		{ label: `Glassdoor "${q.keywords}"`, run: () => searchGlassdoor(q, PER_ACTOR_LIMIT) }
+		{ label: `LinkedIn "${q.keywords}"`, run: () => searchLinkedIn(q, PER_ACTOR_LIMIT, maxAge) },
+		{ label: `Glassdoor "${q.keywords}"`, run: () => searchGlassdoor(q, PER_ACTOR_LIMIT, maxAge) }
 	]);
 	// Apify's free plan allows 5 concurrent runs per account, shared by every user.
 	const settled: PromiseSettledResult<CollectedJob[]>[] = new Array(tasks.length);
@@ -146,17 +146,25 @@ async function collect(queries: SearchQuery[], prefs: PreferencesDto) {
 			errors.push(`${tasks[i].label}: ${reason}`);
 		}
 	});
-	return { jobs, errors, mock: false };
+	return { jobs: withinAge(jobs, maxAge), collected: jobs.length, errors, mock: false };
 }
 
-/** Inserts postings the user has not seen yet; returns the ids of the new rows. */
-function store(userId: string, jobs: CollectedJob[]): string[] {
+/**
+ * Inserts postings the user has not seen yet. `repeated` counts the same posting
+ * returned by more than one query; `known` the ones already stored for this user.
+ */
+function store(userId: string, jobs: CollectedJob[]) {
 	const seen = new Set<string>();
 	const ids: string[] = [];
+	let repeated = 0;
+	let known = 0;
 	const now = Date.now();
 	for (const j of jobs) {
 		const key = `${j.source}:${j.externalId}`;
-		if (seen.has(key)) continue;
+		if (seen.has(key)) {
+			repeated++;
+			continue;
+		}
 		seen.add(key);
 		const id = randomUUID();
 		const res = db()
@@ -180,8 +188,9 @@ function store(userId: string, jobs: CollectedJob[]): string[] {
 			.onConflictDoNothing()
 			.run();
 		if (res.changes) ids.push(id);
+		else known++;
 	}
-	return ids;
+	return { ids, repeated, known };
 }
 
 const Scores = z.object({
@@ -275,7 +284,12 @@ async function scoreBatch(
 	}
 }
 
-async function scorePending(userId: string, prefs: PreferencesDto, latex: string) {
+async function scorePending(
+	userId: string,
+	prefs: PreferencesDto,
+	latex: string,
+	onProgress: (done: number, total: number) => void
+) {
 	const pending = db()
 		.select()
 		.from(schema.job)
@@ -285,8 +299,16 @@ async function scorePending(userId: string, prefs: PreferencesDto, latex: string
 	for (let i = 0; i < pending.length; i += SCORE_BATCH)
 		batches.push(pending.slice(i, i + SCORE_BATCH));
 	// Three batches at a time keeps a 90-job search under a minute without bursting the rate limit.
+	let done = 0;
+	onProgress(0, pending.length);
 	for (let i = 0; i < batches.length; i += 3) {
-		await Promise.all(batches.slice(i, i + 3).map((b) => scoreBatch(b, prefs, latex)));
+		await Promise.all(
+			batches.slice(i, i + 3).map(async (b) => {
+				await scoreBatch(b, prefs, latex);
+				done += b.length;
+				onProgress(done, pending.length);
+			})
+		);
 	}
 }
 
@@ -299,13 +321,28 @@ async function execute(runId: string, userId: string) {
 		updateRun(runId, {
 			message: `Coletando vagas: ${queries.map((q) => `${q.keywords} (${q.location})`).join(' · ')}`
 		});
-		const { jobs, errors, mock } = await collect(queries, prefs);
+		const { jobs, collected, errors, mock } = await collect(queries, prefs);
 		if (!jobs.length && errors.length) throw new Error(errors.join(' | '));
-		const newIds = store(userId, jobs);
-		updateRun(runId, { found: newIds.length, message: `Avaliando ${newIds.length} vagas novas…` });
-		await scorePending(userId, prefs, latex);
+		const { ids, repeated, known } = store(userId, jobs);
+		const tooOld = collected - jobs.length;
+		updateRun(runId, { found: ids.length });
+		await scorePending(userId, prefs, latex, (done, total) =>
+			updateRun(runId, {
+				message: total
+					? `Avaliando as vagas: ${done} de ${total}. As já avaliadas aparecem no feed.`
+					: 'Nenhuma vaga nova para avaliar.'
+			})
+		);
+		// The numbers a person sees rarely match on their own: say where each posting went.
+		const dropped = [
+			repeated ? `${repeated} repetidas entre as buscas` : '',
+			known ? `${known} que você já tinha visto` : '',
+			tooOld ? `${tooOld} publicadas há mais de ${config.jobsMaxAgeDays} dias` : ''
+		].filter(Boolean);
+		const inFeed = feedCount(userId);
 		const notes = [
-			newIds.length ? `${newIds.length} vagas novas.` : 'Nenhuma vaga nova desta vez.',
+			`${collected} vagas coletadas, ${ids.length} novas${dropped.length ? ` (descartadas: ${dropped.join(', ')})` : ''}.`,
+			`Seu feed tem ${inFeed} ${inFeed === 1 ? 'vaga' : 'vagas'} esperando sua decisão.`,
 			mock ? 'Dados de exemplo (APIFY_TOKEN ausente).' : '',
 			errors.length ? `Parte da coleta falhou: ${errors.join(' | ')}` : ''
 		].filter(Boolean);

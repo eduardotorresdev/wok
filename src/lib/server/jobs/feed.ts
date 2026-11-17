@@ -1,4 +1,4 @@
-import { and, eq, notExists, sql } from 'drizzle-orm';
+import { and, count, eq, isNotNull, notExists, sql } from 'drizzle-orm';
 import { db, schema } from '../db/index.ts';
 
 export interface JobDto {
@@ -33,21 +33,37 @@ export function jobDto(row: typeof schema.job.$inferSelect): JobDto {
 	};
 }
 
-/** Jobs not swiped yet, best match first; unscored ones (still being evaluated) go last. */
-export function feed(userId: string, limit = 50): JobDto[] {
+function unswiped(userId: string) {
+	return and(
+		eq(schema.job.userId, userId),
+		notExists(
+			db()
+				.select({ one: sql`1` })
+				.from(schema.swipe)
+				.where(and(eq(schema.swipe.userId, userId), eq(schema.swipe.jobId, schema.job.id)))
+		)
+	);
+}
+
+function searching(userId: string) {
+	return !!db()
+		.select({ id: schema.searchRun.id })
+		.from(schema.searchRun)
+		.where(and(eq(schema.searchRun.userId, userId), eq(schema.searchRun.status, 'running')))
+		.get();
+}
+
+/**
+ * Jobs not swiped yet, best match first. While a search is running only the
+ * already-scored ones are returned, so a card never shows up without its score
+ * and then jumps position; once it ends, anything left unscored goes last.
+ */
+export function feed(userId: string, limit = 200): JobDto[] {
 	const rows = db()
 		.select()
 		.from(schema.job)
 		.where(
-			and(
-				eq(schema.job.userId, userId),
-				notExists(
-					db()
-						.select({ one: sql`1` })
-						.from(schema.swipe)
-						.where(and(eq(schema.swipe.userId, userId), eq(schema.swipe.jobId, schema.job.id)))
-				)
-			)
+			searching(userId) ? and(unswiped(userId), isNotNull(schema.job.matchScore)) : unswiped(userId)
 		)
 		.orderBy(
 			sql`${schema.job.matchScore} is null`,
@@ -57,6 +73,10 @@ export function feed(userId: string, limit = 50): JobDto[] {
 		.limit(limit)
 		.all();
 	return rows.map(jobDto);
+}
+
+export function feedCount(userId: string) {
+	return db().select({ n: count() }).from(schema.job).where(unswiped(userId)).get()?.n ?? 0;
 }
 
 export function getJob(userId: string, jobId: string) {

@@ -44,10 +44,40 @@ export function htmlToText(html: string) {
 		.trim();
 }
 
-export async function searchLinkedIn(query: SearchQuery, limit: number): Promise<CollectedJob[]> {
+/** LinkedIn only filters by day, week or month: the smallest window that covers `days`. */
+function linkedInWindow(days: number) {
+	if (days <= 1) return 'r86400';
+	if (days <= 7) return 'r604800';
+	return 'r2592000';
+}
+
+/**
+ * Drops postings older than `days`. The sites' own filters are coarse (LinkedIn)
+ * or loose (reposted jobs), so the date each posting reports is checked again.
+ * A posting without a date is kept: the site's filter already let it through.
+ */
+export function withinAge(jobs: CollectedJob[], days: number) {
+	const cutoff = Date.now() - days * 86_400_000;
+	return jobs.filter((j) => {
+		if (!j.postedAt) return true;
+		const posted = Date.parse(j.postedAt);
+		return Number.isNaN(posted) || posted >= cutoff;
+	});
+}
+
+export async function searchLinkedIn(
+	query: SearchQuery,
+	limit: number,
+	maxAgeDays: number
+): Promise<CollectedJob[]> {
 	const items = await runActor(
 		LINKEDIN_ACTOR,
-		{ keywords: query.keywords, location: query.location, datePosted: 'r2592000', limit },
+		{
+			keywords: query.keywords,
+			location: query.location,
+			datePosted: linkedInWindow(maxAgeDays),
+			limit
+		},
 		limit
 	);
 	const jobs: CollectedJob[] = [];
@@ -86,10 +116,14 @@ function glassdoorSalary(pay: unknown): string | null {
 	return `${p.currency ?? ''} ${range}${period}`.trim();
 }
 
-export async function searchGlassdoor(query: SearchQuery, limit: number): Promise<CollectedJob[]> {
+export async function searchGlassdoor(
+	query: SearchQuery,
+	limit: number,
+	maxAgeDays: number
+): Promise<CollectedJob[]> {
 	const items = await runActor(
 		GLASSDOOR_ACTOR,
-		{ keywords: query.keywords, location: query.location, daysOld: 30, limit },
+		{ keywords: query.keywords, location: query.location, daysOld: maxAgeDays, limit },
 		limit
 	);
 	const jobs: CollectedJob[] = [];

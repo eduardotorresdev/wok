@@ -63,11 +63,7 @@
 
 	// O servidor pode mandar as mensagens já inteiras; senão elas são remontadas do log.
 	const errorLines = $derived(
-		failure
-			? failure.errors?.trim()
-				? failure.errors.trim().split('\n')
-				: latexErrors(failure.log)
-			: []
+		failure ? (failure.errors?.length ? failure.errors : latexErrors(failure.log)) : []
 	);
 
 	let copied = $state(false);

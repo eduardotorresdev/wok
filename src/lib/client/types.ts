@@ -170,8 +170,8 @@ export interface CompileResult {
 	pages: number;
 	pdfUrl: string | null;
 	log: string;
-	/** Mensagens de erro já inteiras, uma por linha, quando o servidor as extrai. */
-	errors?: string | null;
+	/** Mensagens de erro já inteiras, quando o servidor as extrai. */
+	errors?: string[] | null;
 	/** Uma frase em português dizendo a causa provável e o que fazer. */
 	explanation?: string | null;
 }

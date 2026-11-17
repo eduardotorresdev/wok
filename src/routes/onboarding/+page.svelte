@@ -5,6 +5,7 @@
 	import {
 		compileResumeMutation,
 		preferencesQuery,
+		profileDocQuery,
 		profileQuery,
 		resumeQuery,
 		savePreferencesMutation,
@@ -15,6 +16,7 @@
 	import { emptyPreferences, emptyProfile } from '#lib/client/types.ts';
 	import ConnectAccounts from '#lib/components/ConnectAccounts.svelte';
 	import Icon from '#lib/components/Icon.svelte';
+	import ProfileDocStep from '#lib/components/ProfileDocStep.svelte';
 	import PreferencesFields from '#lib/components/PreferencesFields.svelte';
 	import ProfileFields from '#lib/components/ProfileFields.svelte';
 	import TexUpload from '#lib/components/TexUpload.svelte';
@@ -31,8 +33,17 @@
 	const saveProfile = createMutation(() => saveProfileMutation(client));
 	const search = createMutation(() => searchMutation(client));
 
-	const STEPS = 4;
+	// O passo do perfil profissional só existe quando o servidor já tem o documento.
+	const profileDoc = createQuery(() => profileDocQuery());
+	const kinds = $derived(
+		profileDoc.isSuccess
+			? (['resume', 'doc', 'search', 'area', 'data'] as const)
+			: (['resume', 'search', 'area', 'data'] as const)
+	);
+	const STEPS = $derived(kinds.length);
 	let step = $state(0);
+	const kind = $derived(kinds[step]);
+	let docStep = $state<ReturnType<typeof ProfileDocStep>>();
 	let latex = $state('');
 	let fileName = $state<string | null>(null);
 	let prefs = $state(emptyPreferences());
@@ -60,14 +71,15 @@
 	});
 
 	function validate(): string | null {
-		if (step === 0) {
+		if (kind === 'resume') {
 			if (!latex.trim()) return 'Cole o LaTeX do currículo ou envie o arquivo .tex.';
 			if (!/\\documentclass/.test(latex)) {
 				return 'Falta o \\documentclass: envie o arquivo .tex completo, não só um trecho.';
 			}
 		}
-		if (step === 1 && prefs.terms.length === 0) return 'Adicione pelo menos um termo de busca.';
-		if (step === 2 && !prefs.area.trim()) return 'Escolha sua área.';
+		if (kind === 'search' && prefs.terms.length === 0)
+			return 'Adicione pelo menos um termo de busca.';
+		if (kind === 'area' && !prefs.area.trim()) return 'Escolha sua área.';
 		return null;
 	}
 
@@ -80,11 +92,13 @@
 	function next() {
 		error = validate();
 		if (error) return;
-		if (step === 0 && latex !== resume.data?.latex) {
+		if (kind === 'resume' && latex !== resume.data?.latex) {
 			// Salva e já compila em segundo plano; o resultado aparece em Perfil.
 			saveResume.mutate(latex, { onSuccess: () => compile.mutate(undefined) });
 		}
-		if (step === 2) savePreferences.mutate($state.snapshot(prefs));
+		if (kind === 'area') savePreferences.mutate($state.snapshot(prefs));
+		// Quem gerou o rascunho e segue em frente fica com ele salvo.
+		if (kind === 'doc') void docStep?.flush();
 		if (step < STEPS - 1) go(step + 1);
 		else finish(true);
 	}
@@ -107,8 +121,13 @@
 		}
 	}
 
-	const TITLES = ['Comece pelo', 'O que você', 'Sua área e', 'Dados para'];
-	const KEYWORDS = ['currículo', 'procura', 'nível', 'inscrição'];
+	const HEADINGS = {
+		resume: ['Comece pelo', 'currículo'],
+		doc: ['Seu perfil', 'profissional'],
+		search: ['O que você', 'procura'],
+		area: ['Sua área e', 'nível'],
+		data: ['Dados para', 'inscrição']
+	} as const;
 </script>
 
 <svelte:head><title>Primeiros passos · Wok</title></svelte:head>
@@ -133,11 +152,11 @@
 	<main bind:this={scroller} class="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-8">
 		<p class="t-caption">Passo {step + 1} de {STEPS}</p>
 		<h1 class="t-display mt-1 text-[2.125rem]">
-			{TITLES[step]}
-			<Underline>{KEYWORDS[step]}</Underline>
+			{HEADINGS[kind][0]}
+			<Underline>{HEADINGS[kind][1]}</Underline>
 		</h1>
 
-		{#if step === 0}
+		{#if kind === 'resume'}
 			<p class="mt-4 leading-relaxed text-ink-soft">
 				Cole o código LaTeX ou envie o arquivo .tex. O agente adapta este texto para cada vaga,
 				sempre em uma página.
@@ -167,12 +186,14 @@
 			{#if latex.trim()}
 				<p class="t-caption mt-2">{latex.split('\n').length} linhas</p>
 			{/if}
-		{:else if step === 1}
+		{:else if kind === 'doc'}
+			<ProfileDocStep bind:this={docStep} waiting={saveResume.isPending} />
+		{:else if kind === 'search'}
 			<p class="mt-4 mb-6 leading-relaxed text-ink-soft">
 				O agente usa estes termos para coletar vagas no LinkedIn e no Glassdoor.
 			</p>
 			<PreferencesFields bind:prefs part="search" />
-		{:else if step === 2}
+		{:else if kind === 'area'}
 			<p class="mt-4 mb-6 leading-relaxed text-ink-soft">
 				Cada área tem seu jeito de escrever currículo. Isso ajusta como o agente adapta o seu.
 			</p>

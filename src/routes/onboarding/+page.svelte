@@ -13,6 +13,7 @@
 		searchMutation
 	} from '#lib/client/queries.ts';
 	import { emptyPreferences, emptyProfile } from '#lib/client/types.ts';
+	import ConnectAccounts from '#lib/components/ConnectAccounts.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import PreferencesFields from '#lib/components/PreferencesFields.svelte';
 	import ProfileFields from '#lib/components/ProfileFields.svelte';
@@ -38,6 +39,7 @@
 	let profile = $state(emptyProfile());
 	let error = $state<string | null>(null);
 	let finishing = $state(false);
+	let connectOpen = $state(false);
 	let scroller = $state<HTMLElement>();
 
 	// Quem volta ao onboarding encontra o que já tinha salvo.
@@ -181,6 +183,16 @@
 				depois em Perfil.
 			</p>
 			<ProfileFields bind:profile compact />
+			<div class="mt-8 rounded-sm bg-band p-4">
+				<p class="font-medium">Conectar LinkedIn e Glassdoor</p>
+				<p class="mt-1 text-sm leading-snug text-ink-soft">
+					As candidaturas saem da sua conta. Pode entrar agora ou quando o agente pedir.
+				</p>
+				<button type="button" class="btn btn-quiet mt-3" onclick={() => (connectOpen = true)}>
+					<Icon name="globe" size={20} />
+					Conectar contas
+				</button>
+			</div>
 		{/if}
 	</main>
 
@@ -216,6 +228,8 @@
 		</div>
 	</footer>
 </div>
+
+<ConnectAccounts bind:open={connectOpen} />
 
 <style>
 	.code {

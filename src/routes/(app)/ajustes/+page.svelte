@@ -6,6 +6,7 @@
 	import { authClient } from '#lib/client/auth.ts';
 	import {
 		answersQuery,
+		browserStateQuery,
 		deleteAnswerMutation,
 		preferencesQuery,
 		profileQuery,
@@ -14,7 +15,9 @@
 		searchMutation
 	} from '#lib/client/queries.ts';
 	import { emptyPreferences, emptyProfile } from '#lib/client/types.ts';
+	import ConnectAccounts from '#lib/components/ConnectAccounts.svelte';
 	import Icon from '#lib/components/Icon.svelte';
+	import SourceIcon from '#lib/components/SourceIcon.svelte';
 	import PreferencesFields from '#lib/components/PreferencesFields.svelte';
 	import ProfileFields from '#lib/components/ProfileFields.svelte';
 	import ProfileTabs from '#lib/components/ProfileTabs.svelte';
@@ -29,6 +32,8 @@
 	const deleteAnswer = createMutation(() => deleteAnswerMutation(client));
 	const search = createMutation(() => searchMutation(client));
 	const session = authClient.useSession();
+	const remote = createQuery(() => browserStateQuery());
+	let connectOpen = $state(false);
 
 	let prefs = $state(emptyPreferences());
 	let profile = $state(emptyProfile());
@@ -150,6 +155,32 @@
 		{/if}
 	</section>
 
+	<section class="mt-12" aria-labelledby="contas">
+		<h2 id="contas" class="t-title">Contas conectadas</h2>
+		<p class="mt-1 text-[0.9375rem] leading-relaxed text-ink-soft">
+			As candidaturas saem da sua conta: entre uma vez e o agente reaproveita a sessão.
+		</p>
+		<ul class="mt-3 divide-y divide-line border-y border-line">
+			{#each [['linkedin', 'LinkedIn'], ['glassdoor', 'Glassdoor']] as const as [key, label] (key)}
+				<li class="flex min-h-12 items-center gap-2.5">
+					<SourceIcon source={key} size={18} />
+					<span class="flex-1">{label}</span>
+					{#if remote.data?.accounts[key]}
+						<span class="inline-flex items-center gap-1 text-sm font-medium text-primary-deep">
+							<Icon name="check" size={16} stroke={2.4} /> Conectada
+						</span>
+					{:else}
+						<span class="text-sm text-ink-soft">Não conectada</span>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+		<button type="button" class="btn btn-quiet mt-4" onclick={() => (connectOpen = true)}>
+			<Icon name="globe" size={20} />
+			Conectar contas
+		</button>
+	</section>
+
 	<section class="mt-12" aria-labelledby="respostas">
 		<h2 id="respostas" class="t-title">Respostas salvas</h2>
 		<p class="mt-1 text-[0.9375rem] leading-relaxed text-ink-soft">
@@ -192,3 +223,5 @@
 		</button>
 	</section>
 </div>
+
+<ConnectAccounts bind:open={connectOpen} />

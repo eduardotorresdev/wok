@@ -58,7 +58,8 @@ const ADDED_COLUMNS: [table: string, column: string, type: string][] = [
 	['application', 'pending_question', 'TEXT'],
 	['job', 'company_logo', 'TEXT'],
 	['application', 'last_url', 'TEXT'],
-	['job', 'apply_type', 'TEXT']
+	['job', 'apply_type', 'TEXT'],
+	['job', 'via_job_id', 'TEXT']
 ];
 
 function addMissingColumns(database: Database.Database) {

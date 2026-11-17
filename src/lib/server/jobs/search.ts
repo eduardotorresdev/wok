@@ -6,6 +6,7 @@ import { db, schema } from '../db/index.ts';
 import { getPreferences, type PreferencesDto } from '../preferences.ts';
 import { profileContext } from '../profile-document.ts';
 import { getResumeRow } from '../resume.ts';
+import { linkTwins } from './twins.ts';
 import { config } from '../env.ts';
 import { hasApify, searchGlassdoor, searchLinkedIn, withinAge } from './apify.ts';
 import { feedCount } from './feed.ts';
@@ -348,6 +349,7 @@ async function execute(runId: string, userId: string) {
 		const { jobs, collected, errors, mock } = await collect(queries, prefs);
 		if (!jobs.length && errors.length) throw new Error(errors.join(' | '));
 		const { ids, repeated, known } = store(userId, jobs);
+		linkTwins(userId);
 		const tooOld = collected - jobs.length;
 		updateRun(runId, { found: ids.length });
 		await scorePending(userId, prefs, latex, (done, total) =>

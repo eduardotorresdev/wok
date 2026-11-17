@@ -1,4 +1,4 @@
-import { and, count, eq, isNotNull, notExists, sql } from 'drizzle-orm';
+import { and, count, eq, isNotNull, isNull, notExists, sql } from 'drizzle-orm';
 import { connectedAccounts } from '../browser/service.ts';
 import { db, schema } from '../db/index.ts';
 import { config } from '../env.ts';
@@ -27,8 +27,14 @@ export interface JobDto {
 	matchReasons: string[];
 }
 
-export function applyVia(row: { source: 'linkedin' | 'glassdoor'; applyUrl: string | null }) {
-	return row.applyUrl ? 'company' : row.source;
+/** A Glassdoor posting with a LinkedIn twin is applied to through the twin. */
+export function applyVia(row: {
+	source: 'linkedin' | 'glassdoor';
+	applyUrl: string | null;
+	viaJobId?: string | null;
+}) {
+	if (row.applyUrl) return 'company';
+	return row.viaJobId ? 'linkedin' : row.source;
 }
 
 type Connected = { linkedin: boolean; glassdoor: boolean };
@@ -39,7 +45,7 @@ type Connected = { linkedin: boolean; glassdoor: boolean };
  * needs none either, since the person applies there by themselves.
  */
 export function blockedBy(
-	row: { source: 'linkedin' | 'glassdoor'; applyUrl: string | null },
+	row: { source: 'linkedin' | 'glassdoor'; applyUrl: string | null; viaJobId?: string | null },
 	accounts: Connected
 ): 'linkedin' | 'glassdoor' | null {
 	const via = applyVia(row);
@@ -76,6 +82,8 @@ export function jobDto(row: typeof schema.job.$inferSelect, accounts?: Connected
 function unswiped(userId: string) {
 	return and(
 		eq(schema.job.userId, userId),
+		// The second posting of one opening is not shown: its LinkedIn twin is the card.
+		isNull(schema.job.viaJobId),
 		notExists(
 			db()
 				.select({ one: sql`1` })

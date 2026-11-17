@@ -45,6 +45,8 @@ export const job = sqliteTable(
 		url: text('url').notNull(),
 		applyUrl: text('apply_url'),
 		applyType: text('apply_type').$type<'easy' | 'external'>(),
+		/** The same opening on LinkedIn, through which a Glassdoor posting is applied to. */
+		viaJobId: text('via_job_id'),
 		salary: text('salary'),
 		postedAt: text('posted_at'),
 		summary: text('summary'),

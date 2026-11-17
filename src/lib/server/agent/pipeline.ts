@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
 	getRow,
 	listSteps,
@@ -59,6 +59,26 @@ async function runApplication(applicationId: string) {
 	const prefs = getPreferences(userId);
 	const profile = getProfile(userId);
 	const area = prefs.area || prefs.terms[0] || '';
+
+	// The same opening on LinkedIn: this application goes through that posting.
+	const twin = job.viaJobId
+		? db().select().from(schema.job).where(eq(schema.job.id, job.viaJobId)).get()
+		: undefined;
+	if (twin) {
+		const other = db()
+			.select({ id: schema.application.id })
+			.from(schema.application)
+			.where(and(eq(schema.application.userId, userId), eq(schema.application.jobId, twin.id)))
+			.get();
+		if (other) {
+			return void setStatus(
+				applicationId,
+				'failed',
+				'Esta é a mesma vaga que já está nas suas inscrições pelo LinkedIn; não vou me candidatar duas vezes.'
+			);
+		}
+	}
+	const target = twin ?? job;
 
 	// ------------------------------------------------------------ before any form
 	// Every form asks for name and phone; asking now is cheaper than stopping mid-form.
@@ -171,10 +191,10 @@ async function runApplication(applicationId: string) {
 				title: job.title,
 				company: job.company,
 				location: job.location,
-				url: job.applyUrl || job.url,
+				url: target.applyUrl || target.url,
 				description: job.description ?? ''
 			},
-			source: job.source,
+			source: target.source,
 			resumePdfPath: pdfPath,
 			resumeText: compiled?.text ?? '',
 			email: user?.email ?? '',

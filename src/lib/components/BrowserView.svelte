@@ -43,7 +43,7 @@
 	} = $props();
 
 	const id = $props.id();
-	let frame = $state<{ src: string; width: number; height: number } | null>(null);
+	let frame = $state<{ src: string; width: number; height: number; nav?: number } | null>(null);
 	let remote = $state<BrowserState | null>(null);
 	let online = $state(false);
 	let notice = $state<string | null>(null);
@@ -62,12 +62,11 @@
 
 	// O servidor responde na hora e a página abre em segundo plano: até `loading` cair,
 	// a tela mostra o aviso de abertura e não aceita toque nem teclado.
-	// `stale`: a imagem na tela ainda é da página anterior. Vira falso no primeiro frame
-	// depois de a página nova responder; a partir daí a tela já pode ser usada, mesmo que
-	// o servidor ainda diga `loading` ou termine em `loadError`.
-	let stale = $state(false);
-	let answered = false;
-	let titleBefore: string | null = null;
+	// `stale`: a imagem na tela ainda é da página anterior (o frame traz a navegação a que
+	// pertence). Enquanto for, a tela não aceita toque: ele cairia na página errada.
+	const stale = $derived(
+		!!frame && frame.nav != null && remote?.nav != null && frame.nav < remote.nav
+	);
 	let errorDismissed = $state(false);
 	const loading = $derived(opening || (!!remote?.loading && (stale || !frame)));
 	const loadError = $derived(opening || remote?.loading ? null : (remote?.loadError ?? null));
@@ -75,8 +74,16 @@
 	const errorFull = $derived(!!loadError && (!frame || stale));
 	const errorNote = $derived(!!loadError && !errorFull && !errorDismissed);
 	const canControl = $derived(
-		mode === 'control' && remote?.controller === 'user' && !loading && !errorFull
+		mode === 'control' && remote?.controller === 'user' && !loading && !stale && !errorFull
 	);
+	// O site respondeu mas a imagem nova não chegou (rede lenta): depois de um instante,
+	// diz isso em vez de deixar a página antiga parada sem explicação.
+	let slow = $state(false);
+	$effect(() => {
+		if (loading || errorFull || !stale) return void (slow = false);
+		const timer = setTimeout(() => (slow = true), 1500);
+		return () => clearTimeout(timer);
+	});
 	const ratio = $derived.by(() => {
 		const size = remote?.viewport ?? frame;
 		return size && size.width > 0 ? size.height / size.width : 2.04;
@@ -117,17 +124,7 @@
 	});
 
 	function setState(state: BrowserState) {
-		if (state.loading && !remote?.loading) {
-			// Começou a abrir outra página: o que está na tela é da anterior.
-			stale = true;
-			answered = false;
-			errorDismissed = false;
-			titleBefore = remote?.title ?? null;
-		} else if (state.loading && state.title && state.title !== titleBefore) {
-			// Título novo e real: a página respondeu. O próximo frame já é dela.
-			if (!/^(loading |about:)/i.test(state.title)) answered = true;
-		}
-		if (!state.loading && !state.loadError) stale = false;
+		if (state.loading && !remote?.loading) errorDismissed = false;
 		remote = state;
 		onstate?.(state);
 	}
@@ -158,11 +155,11 @@
 		source.addEventListener('frame', (event) => {
 			const data = JSON.parse((event as MessageEvent).data) as BrowserFrame;
 			trouble = null;
-			if (answered) stale = false;
 			frame = {
 				src: `data:image/jpeg;base64,${data.jpeg}`,
 				width: data.width,
-				height: data.height
+				height: data.height,
+				nav: data.nav
 			};
 		});
 		source.addEventListener('state', (event) => {
@@ -632,6 +629,8 @@
 					<p class="text-sm leading-snug text-ink-soft">
 						{#if mode === 'watch'}
 							O browser aparece aqui quando o agente abrir a página da vaga.
+						{:else if remote?.open}
+							A página está demorando para aparecer…
 						{:else if shortcuts}
 							Escolha um site acima para abrir.
 						{:else}
@@ -657,7 +656,15 @@
 					</span>
 				{/if}
 			{/if}
-			{#if loading}
+			{#if slow}
+				<div
+					class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-paper/80 px-6 text-center text-sm font-medium"
+					role="status"
+				>
+					A página está demorando para aparecer…
+					<span class="progress" aria-hidden="true"><span></span></span>
+				</div>
+			{:else if loading}
 				<div
 					class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-paper/80 text-sm font-medium"
 					role="status"

@@ -190,6 +190,8 @@ export interface BrowserState {
 	loading?: boolean;
 	/** A navegação falhou: frase pronta para mostrar. */
 	loadError?: string | null;
+	/** Sobe a cada navegação da aba; um frame com nav menor ainda é da página anterior. */
+	nav?: number;
 	/** O Glassdoor barra o nosso browser: lá a pessoa se inscreve por conta própria. */
 	glassdoorManual?: boolean;
 	accounts: { linkedin: boolean; glassdoor: boolean };
@@ -200,6 +202,9 @@ export interface BrowserFrame {
 	jpeg: string;
 	width: number;
 	height: number;
+	url?: string;
+	/** Navegação da aba a que esta imagem pertence (compare com state.nav). */
+	nav?: number;
 }
 
 /** Coordenadas em pixels CSS do viewport remoto (state.viewport). */

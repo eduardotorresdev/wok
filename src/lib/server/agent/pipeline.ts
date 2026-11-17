@@ -67,7 +67,7 @@ async function runApplication(applicationId: string) {
 				applicationId,
 				'needs_user',
 				'Seu currículo base não compila, então não consigo adaptá-lo. Corrija o LaTeX na tela Currículo e toque em retomar.',
-				{ needsKind: 'question' }
+				{ needsKind: 'resume' }
 			);
 		}
 	}
@@ -108,7 +108,7 @@ async function runApplication(applicationId: string) {
 				applicationId,
 				'needs_user',
 				`Não consegui adaptar o currículo para 1 página: ${describeLlmError(err)} Ajuste o currículo base se quiser e toque em retomar.`,
-				{ needsKind: 'question' }
+				{ needsKind: 'resume' }
 			);
 		}
 	}
@@ -119,7 +119,14 @@ async function runApplication(applicationId: string) {
 		.slice(-25)
 		.map((s) => s.message);
 	const hadAttempt = listSteps(applicationId).some((s) => s.kind === 'action');
-	setStatus(applicationId, 'applying', 'Preenchendo a candidatura no site da vaga.');
+	const dryRun = config.applyDryRunFor(user?.email ?? '');
+	setStatus(
+		applicationId,
+		'applying',
+		dryRun
+			? 'Preenchendo a candidatura no site da vaga (modo de teste: nada será enviado).'
+			: 'Preenchendo a candidatura no site da vaga.'
+	);
 	const strategy = area ? getAreaStrategy(area) : null;
 	// The text the form-filler reads is the one actually inside the PDF being uploaded.
 	const compiled = await compileLatex(tailoredLatex, `${workDir}/text`).catch(() => null);
@@ -146,7 +153,7 @@ async function runApplication(applicationId: string) {
 			area,
 			areaStrategy: strategy,
 			history: hadAttempt ? history : [],
-			dryRun: config.applyDryRun,
+			dryRun,
 			onStep: (kind, message, data) => logStep(applicationId, kind, message, data)
 		});
 	} catch (err) {

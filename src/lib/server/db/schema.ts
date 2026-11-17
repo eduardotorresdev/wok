@@ -80,7 +80,7 @@ export const application = sqliteTable(
 		tailoredPdfPath: text('tailored_pdf_path'),
 		lastMessage: text('last_message'),
 		/** Set while status is needs_user: what the user has to do. */
-		needsKind: text('needs_kind').$type<'question' | 'browser'>(),
+		needsKind: text('needs_kind').$type<'question' | 'browser' | 'resume'>(),
 		pendingQuestion: text('pending_question'),
 		createdAt: integer('created_at').notNull(),
 		updatedAt: integer('updated_at').notNull()

@@ -19,8 +19,11 @@ export interface ApplicationDto {
 	status: ApplicationStatus;
 	tailoredPdfUrl: string | null;
 	lastMessage: string | null;
-	/** While needs_user: 'question' (answer it) or 'browser' (act in the browser, then resume). */
-	needsKind: 'question' | 'browser' | null;
+	/**
+	 * While needs_user: 'question' (answer pendingQuestion), 'browser' (act in the
+	 * browser, then resume) or 'resume' (fix the résumé at /curriculo, then resume).
+	 */
+	needsKind: 'question' | 'browser' | 'resume' | null;
 	pendingQuestion: string | null;
 	createdAt: string;
 	updatedAt: string;

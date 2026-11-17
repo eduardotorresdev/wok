@@ -38,9 +38,19 @@ export const config = {
 		const days = Number(privateEnv.JOBS_MAX_AGE_DAYS);
 		return Number.isFinite(days) && days >= 1 ? Math.floor(days) : 14;
 	},
-	/** When on, the applier fills everything but never presses the final submit. */
-	get applyDryRun() {
-		return ['1', 'true', 'yes'].includes((privateEnv.APPLY_DRY_RUN || '').toLowerCase());
+	/**
+	 * Rehearsal mode: the applier fills everything but never presses the final
+	 * submit. APPLY_DRY_RUN=1 turns it on for everyone (development);
+	 * APPLY_DRY_RUN_EMAILS limits it to the listed accounts, so QA can rehearse
+	 * in production while everyone else's applications are really sent.
+	 */
+	applyDryRunFor(email: string) {
+		if (['1', 'true', 'yes'].includes((privateEnv.APPLY_DRY_RUN || '').toLowerCase())) return true;
+		const listed = (privateEnv.APPLY_DRY_RUN_EMAILS || '')
+			.split(',')
+			.map((e) => e.trim().toLowerCase())
+			.filter(Boolean);
+		return !!email && listed.includes(email.trim().toLowerCase());
 	},
 	get isProduction() {
 		return privateEnv.NODE_ENV === 'production';

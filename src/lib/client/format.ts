@@ -42,11 +42,13 @@ export function clockTime(iso: string) {
 }
 
 /** "Inscrição pelo site da empresa", quando o servidor informa o caminho. */
-export function applyViaLabel(job: Pick<Job, 'applyVia'>) {
-	if (job.applyVia === 'company') return 'Inscrição pelo site da empresa';
-	if (job.applyVia === 'linkedin') return 'Inscrição pelo LinkedIn';
+export function applyViaLabel(job: Pick<Job, 'applyVia' | 'applyType'>) {
 	// No Glassdoor o agente prepara e a pessoa envia: isso precisa estar dito antes do gesto.
 	if (job.applyVia === 'glassdoor') return 'Você envia pelo Glassdoor';
+	if (job.applyType === 'easy') return 'Candidatura simplificada no LinkedIn';
+	if (job.applyType === 'external') return 'Leva ao site da empresa';
+	if (job.applyVia === 'company') return 'Inscrição pelo site da empresa';
+	if (job.applyVia === 'linkedin') return 'Inscrição pelo LinkedIn';
 	return null;
 }
 

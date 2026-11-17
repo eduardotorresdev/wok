@@ -374,6 +374,15 @@ export async function mock(method: string, path: string, body: unknown): Promise
 		};
 		return profileDoc;
 	}
+	if (route === 'POST /api/profile/document/do-not-claim') {
+		await wait(600);
+		profileDoc = {
+			...profileDoc,
+			markdown: `${profileDoc.markdown.trimEnd()}\n\n## O que não afirmar\n- ${String(input.statement)}\n`,
+			updatedAt: new Date().toISOString()
+		};
+		return profileDoc;
+	}
 	if (route.startsWith('GET /api/browser') || route.startsWith('POST /api/browser')) {
 		if (route === 'POST /api/browser/open') browserOpen = true;
 		if (route === 'POST /api/browser/close') browserOpen = false;

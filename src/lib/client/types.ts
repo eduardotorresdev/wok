@@ -16,6 +16,8 @@ export interface Job {
 	matchReasons: string[];
 	/** Por onde a inscrição será feita. Ausente em servidores antigos. */
 	applyVia?: 'company' | 'linkedin' | 'glassdoor' | null;
+	/** Como a vaga recebe candidaturas no site de origem. */
+	applyType?: 'easy' | 'external' | null;
 	/** Falso quando falta conectar a conta do provedor da vaga. Ausente em servidores antigos. */
 	canApply?: boolean;
 	blockedBy?: Provider | null;

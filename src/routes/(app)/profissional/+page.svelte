@@ -2,6 +2,7 @@
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import {
 		answerProfileDocMutation,
+		draftProblem,
 		draftProfileDocMutation,
 		profileDocQuery,
 		saveProfileDocMutation
@@ -15,7 +16,7 @@
 	const client = useQueryClient();
 	const doc = createQuery(() => profileDocQuery());
 	const save = createMutation(() => saveProfileDocMutation(client));
-	const draft = createMutation(() => draftProfileDocMutation());
+	const draft = createMutation(() => draftProfileDocMutation(client));
 	const answer = createMutation(() => answerProfileDocMutation(client));
 
 	const OUTLINE = [
@@ -46,8 +47,11 @@
 	function saveNow() {
 		const sent = text;
 		save.mutate(sent, {
-			onSuccess: () => {
-				if (text === sent) drafted = false;
+			onSuccess: (stored) => {
+				if (text !== sent) return;
+				drafted = false;
+				// O servidor pode normalizar o texto; a tela passa a mostrar o que ficou salvo.
+				text = stored.markdown;
 			},
 			onError: () =>
 				toast({ text: 'Não deu para salvar. Seu texto continua aqui.', tone: 'danger' })
@@ -61,8 +65,7 @@
 				drafted = true;
 				view = 'edit';
 			},
-			onError: () =>
-				toast({ text: 'Não deu para gerar o rascunho. Tente de novo.', tone: 'danger' })
+			onError: (error) => toast({ text: draftProblem(error), tone: 'danger' })
 		});
 	}
 
@@ -149,6 +152,7 @@
 					aria-label="Perfil profissional em markdown"
 					autocapitalize="sentences"
 					placeholder={OUTLINE}
+					maxlength={60000}
 					bind:value={text}></textarea>
 			{:else if text.trim()}
 				<div class="paper mt-3 px-4 py-4"><Markdown source={text} /></div>
@@ -176,11 +180,16 @@
 					<Icon name="refresh" size={20} />
 					{draft.isPending ? 'Lendo seu currículo…' : 'Gerar rascunho a partir do currículo'}
 				</button>
-				<p class="t-caption">
-					{text.trim()
-						? 'O rascunho substitui o texto acima e só vale depois de salvo.'
-						: 'Leva alguns segundos. O rascunho só vale depois de salvo.'}
-				</p>
+				{#if draft.isPending}
+					<div class="progress" role="progressbar" aria-label="Gerando rascunho"><span></span></div>
+					<p class="t-caption">Costuma levar uns 10 segundos. Pode continuar nesta tela.</p>
+				{:else}
+					<p class="t-caption">
+						{text.trim()
+							? 'O rascunho substitui o texto acima e só vale depois de salvo.'
+							: 'Leva uns 10 segundos. O rascunho só vale depois de salvo.'}
+					</p>
+				{/if}
 			</div>
 
 			{#if questions.length > 0}
@@ -230,6 +239,28 @@
 </div>
 
 <style>
+	/* Progresso estimado: enche em ~12 s e espera perto do fim. */
+	.progress {
+		height: 3px;
+		border-radius: 2px;
+		background: var(--color-band);
+		overflow: hidden;
+	}
+	.progress span {
+		display: block;
+		height: 100%;
+		background: var(--color-primary);
+		transform-origin: left;
+		animation: fill 12s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+	}
+	@keyframes fill {
+		from {
+			transform: scaleX(0.03);
+		}
+		to {
+			transform: scaleX(0.94);
+		}
+	}
 	.doc {
 		display: block;
 		min-height: 24rem;

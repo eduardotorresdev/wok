@@ -362,12 +362,7 @@
 						><Icon name="check" size={16} stroke={2.4} /></span
 					>{/if}
 			</button>
-			{#if remote?.glassdoorManual}
-				<p class="chip text-ink-soft" style="font-weight: 400">
-					<SourceIcon source="glassdoor" />
-					Glassdoor: você se inscreve no site
-				</p>
-			{:else}
+			{#if !remote?.glassdoorManual}
 				<button type="button" class="chip" disabled={opening} onclick={() => open(LOGIN.glassdoor)}>
 					<SourceIcon source="glassdoor" />
 					Glassdoor
@@ -386,6 +381,12 @@
 				Outro site
 			</button>
 		</div>
+		{#if remote?.glassdoorManual}
+			<p class="t-caption mb-2 flex items-center gap-1.5">
+				<SourceIcon source="glassdoor" size={14} />
+				No Glassdoor a inscrição é feita por você, no site.
+			</p>
+		{/if}
 		{#if urlOpen}
 			<form
 				class="mb-2 flex gap-2"

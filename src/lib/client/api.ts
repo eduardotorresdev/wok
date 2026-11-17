@@ -155,7 +155,7 @@ export const api = {
 				languages: profile.languages.filter((item) => item.language.trim()),
 				certifications: profile.certifications.filter((item) => item.name.trim())
 			}),
-		// Perfil profissional (markdown). Caminhos provisórios até o Back-End fechar o contrato.
+		// Perfil profissional (markdown).
 		doc: {
 			get: () => call<ProfileDoc>('GET', '/api/profile/document'),
 			save: (markdown: string) => call<ProfileDoc>('PUT', '/api/profile/document', { markdown }),
@@ -163,7 +163,10 @@ export const api = {
 			draft: () => call<{ markdown: string }>('POST', '/api/profile/document/draft', {}),
 			/** A resposta é incorporada ao documento; volta o markdown atualizado. */
 			answer: (questionId: string, answer: string) =>
-				call<ProfileDoc>('POST', '/api/profile/document/answer', { questionId, answer })
+				call<ProfileDoc>('POST', '/api/profile/document/answer', { questionId, answer }),
+			/** Acrescenta uma frase à seção "O que não afirmar". */
+			doNotClaim: (statement: string) =>
+				call<ProfileDoc>('POST', '/api/profile/document/do-not-claim', { statement })
 		},
 		answers: () => call<SavedAnswer[]>('GET', '/api/profile/answers'),
 		deleteAnswer: (id: string) =>

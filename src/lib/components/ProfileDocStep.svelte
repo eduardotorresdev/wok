@@ -6,6 +6,7 @@
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import {
 		answerProfileDocMutation,
+		draftProblem,
 		draftProfileDocMutation,
 		profileDocQuery,
 		saveProfileDocMutation
@@ -24,7 +25,7 @@
 	const client = useQueryClient();
 	const doc = createQuery(() => profileDocQuery());
 	const save = createMutation(() => saveProfileDocMutation(client));
-	const draft = createMutation(() => draftProfileDocMutation());
+	const draft = createMutation(() => draftProfileDocMutation(client));
 	const answer = createMutation(() => answerProfileDocMutation(client));
 
 	/** Rascunho gerado e ainda não salvo. */
@@ -43,7 +44,7 @@
 		problem = null;
 		draft.mutate(undefined, {
 			onSuccess: (result) => (pending = result.markdown),
-			onError: () => (problem = 'Não deu para gerar o rascunho. Tente de novo ou siga em frente.')
+			onError: (error) => (problem = `${draftProblem(error)} Você também pode seguir em frente.`)
 		});
 	}
 
@@ -105,7 +106,10 @@
 		{#if waiting}Salvando seu currículo…{:else if draft.isPending}Lendo seu currículo…{:else}Gerar
 			rascunho a partir do currículo{/if}
 	</button>
-	<p class="t-caption mt-2">Leva alguns segundos.</p>
+	{#if draft.isPending}
+		<div class="progress mt-3" role="progressbar" aria-label="Gerando rascunho"><span></span></div>
+	{/if}
+	<p class="t-caption mt-2">Costuma levar uns 10 segundos.</p>
 {/if}
 
 {#if problem}<p class="mt-3 text-sm text-danger" role="alert">{problem}</p>{/if}
@@ -148,3 +152,27 @@
 		</ul>
 	</section>
 {/if}
+
+<style>
+	.progress {
+		height: 3px;
+		border-radius: 2px;
+		background: var(--color-band);
+		overflow: hidden;
+	}
+	.progress span {
+		display: block;
+		height: 100%;
+		background: var(--color-primary);
+		transform-origin: left;
+		animation: fill 12s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+	}
+	@keyframes fill {
+		from {
+			transform: scaleX(0.03);
+		}
+		to {
+			transform: scaleX(0.94);
+		}
+	}
+</style>

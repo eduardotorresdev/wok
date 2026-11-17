@@ -1,6 +1,6 @@
 import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/svelte-query';
 import { browser } from '$app/env';
-import { api } from './api.ts';
+import { ApiError, api } from './api.ts';
 import type {
 	Application,
 	Job,
@@ -128,10 +128,32 @@ export const saveProfileDocMutation = (client: QueryClient) =>
 		}
 	});
 
-export const draftProfileDocMutation = () =>
+export const draftProfileDocMutation = (client: QueryClient) =>
 	mutationOptions({
 		mutationKey: ['profile', 'document', 'draft'],
-		mutationFn: () => api.profile.doc.draft()
+		mutationFn: () => api.profile.doc.draft(),
+		// O rascunho não é salvo, mas o servidor grava as perguntas que ele levantou.
+		onSuccess: () => client.invalidateQueries({ queryKey: keys.profileDoc })
+	});
+
+/** Por que o rascunho não saiu, em palavras de quem usa. */
+export function draftProblem(error: unknown) {
+	if (error instanceof ApiError && error.code === 'nothing_to_draft') {
+		return 'Salve seu currículo primeiro: o rascunho é feito a partir dele.';
+	}
+	if (error instanceof ApiError && error.code === 'llm_unavailable') {
+		return 'O agente está indisponível agora. Tente de novo em alguns minutos.';
+	}
+	return 'Não deu para gerar o rascunho. Tente de novo.';
+}
+
+export const doNotClaimMutation = (client: QueryClient) =>
+	mutationOptions({
+		mutationKey: ['profile', 'document', 'do-not-claim'],
+		mutationFn: (statement: string) => api.profile.doc.doNotClaim(statement),
+		onSuccess: (saved) => {
+			if (saved) client.setQueryData(keys.profileDoc, saved);
+		}
 	});
 
 export const answerProfileDocMutation = (client: QueryClient) =>

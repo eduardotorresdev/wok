@@ -9,6 +9,7 @@
 	import { ApiError } from '#lib/client/api.ts';
 	import { applyViaLabel, clockTime, sourceLabel } from '#lib/client/format.ts';
 	import {
+		doNotClaimMutation,
 		answerMutation,
 		markSubmittedMutation,
 		applicationQuery,
@@ -45,6 +46,26 @@
 	const answer = createMutation(() => answerMutation(client));
 	const resume = createMutation(() => resumeApplicationMutation(client));
 	const markSubmitted = createMutation(() => markSubmittedMutation(client));
+
+	// "Isso não é verdade": a frase vai para "O que não afirmar" do perfil profissional.
+	const doNotClaim = createMutation(() => doNotClaimMutation(client));
+	let claimOpen = $state(false);
+	let claim = $state('');
+	let claimNoted = $state(false);
+
+	function sendClaim(event: SubmitEvent) {
+		event.preventDefault();
+		const statement = claim.trim();
+		if (!statement || doNotClaim.isPending) return;
+		doNotClaim.mutate(statement, {
+			onSuccess: () => {
+				claim = '';
+				claimOpen = false;
+				claimNoted = true;
+			},
+			onError: () => toast({ text: 'Não deu para anotar. Tente de novo.', tone: 'danger' })
+		});
+	}
 	const via = $derived(app ? applyViaLabel(app.job) : null);
 	let offsite = $state<HTMLElement>();
 
@@ -329,6 +350,48 @@
 			<section class="mt-5 border-l-2 border-primary pl-3.5">
 				<h3 class="t-caption text-primary-deep">O que o agente fez no seu currículo</h3>
 				<p class="mt-1 text-[0.9375rem] leading-relaxed whitespace-pre-line">{note.message}</p>
+				{#if claimNoted}
+					<p class="t-caption mt-2 flex items-center gap-1.5" role="status">
+						<span class="text-primary"><Icon name="check" size={16} stroke={2.4} /></span>
+						Anotado no seu perfil. O agente não vai mais afirmar isso.
+					</p>
+				{/if}
+				{#if claimOpen}
+					<form class="mt-2" onsubmit={sendClaim}>
+						<label for="claim-{app.id}" class="t-label block"
+							>O que o agente não deve afirmar?</label
+						>
+						<div class="mt-2 flex gap-2">
+							<input
+								id="claim-{app.id}"
+								class="field min-w-0 flex-1"
+								autocomplete="off"
+								enterkeyhint="send"
+								maxlength={300}
+								placeholder="ex.: não liderei esse time"
+								bind:value={claim}
+							/>
+							<button
+								type="submit"
+								class="btn shrink-0"
+								disabled={!claim.trim() || doNotClaim.isPending}
+							>
+								{doNotClaim.isPending ? 'Anotando…' : 'Anotar'}
+							</button>
+						</div>
+					</form>
+				{:else}
+					<button
+						type="button"
+						class="mt-1 min-h-11 text-sm font-medium text-primary-deep underline decoration-primary/40 underline-offset-4"
+						onclick={() => {
+							claimOpen = true;
+							claimNoted = false;
+						}}
+					>
+						{claimNoted ? 'Anotar outra coisa' : 'Isso não é verdade / não quero que afirme'}
+					</button>
+				{/if}
 			</section>
 		{/if}
 

@@ -32,6 +32,11 @@ redirects_to_login() { # url
 	case "$got" in "303 "*/login*) ;; *) echo "esperado 303 -> /login, veio: $got"; return 1 ;; esac
 }
 
+unauthorized_json() { # url: sem sessão deve dar 401 com corpo JSON
+	local got; got="$(curl -s -o /dev/null -m 20 -w '%{http_code} %{content_type}' "$1")"
+	case "$got" in "401 application/json"*) ;; *) echo "esperado 401 JSON, veio: $got"; return 1 ;; esac
+}
+
 magic_link() {
 	local body code
 	body="$(mktemp)"
@@ -67,11 +72,15 @@ check "local / sem sessão -> 303 /login"          redirects_to_login "$LOCAL/"
 check "local /login 200"                          http_is "$LOCAL/login" 200
 check "local /api/auth respondendo (/api/auth/ok)" http_is "$LOCAL/api/auth/ok" 200
 check "magic link real via Resend -> $EMAIL"      magic_link
+check "local /api/jobs/feed sem sessão -> 401 JSON"    unauthorized_json "$LOCAL/api/jobs/feed"
+check "local /api/applications sem sessão -> 401 JSON" unauthorized_json "$LOCAL/api/applications"
 # Público: DNS + túnel + TLS.
 check "HTTPS $BASE/ -> 303 /login"                redirects_to_login "$BASE/"
 check "HTTPS $BASE/login 200"                     http_is "$BASE/login" 200
 check "HTTPS $BASE/api/health 200"                http_is "$BASE/api/health" 200
 check "HTTPS $BASE/api/auth/ok 200"               http_is "$BASE/api/auth/ok" 200
+check "HTTPS /api/jobs/feed sem sessão -> 401 JSON"    unauthorized_json "$BASE/api/jobs/feed"
+check "HTTPS /api/applications sem sessão -> 401 JSON" unauthorized_json "$BASE/api/applications"
 check "Chromium headless abre no servidor"       chromium_opens
 check "tectonic compila um .tex"                 tectonic_compiles
 exit $fail

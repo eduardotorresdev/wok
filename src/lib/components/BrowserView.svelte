@@ -17,6 +17,8 @@
 		shortcuts = false,
 		takeover = false,
 		maxHeight = 0.56,
+		applicationId,
+		fallbackUrl,
 		onstate
 	}: {
 		mode?: 'watch' | 'control';
@@ -26,6 +28,10 @@
 		takeover?: boolean;
 		/** Altura máxima da tela remota, como fração da altura da janela. */
 		maxHeight?: number;
+		/** Inscrição dona do browser; o servidor mostra a sessão dela. */
+		applicationId?: string;
+		/** Saída de emergência quando a página remota não abre: a vaga no site de origem. */
+		fallbackUrl?: string;
 		onstate?: (state: BrowserState) => void;
 	} = $props();
 
@@ -35,6 +41,10 @@
 	let online = $state(false);
 	let notice = $state<string | null>(null);
 	let opening = $state(false);
+	// O visor nunca fica mudo: sem página, diz que está reabrindo ou que falhou.
+	let trouble = $state<'reopening' | 'failed' | null>(null);
+	let attempt = $state(0);
+	let lastUrl: string | null = null;
 	let boxWidth = $state(0);
 	let viewportHeight = $state(700);
 	let text = $state('');
@@ -65,24 +75,30 @@
 
 	$effect(() => {
 		if (!browser) return;
+		void attempt; // "Tentar de novo" refaz a conexão
 		viewportHeight = window.innerHeight;
 
 		if (import.meta.env.DEV && new URLSearchParams(location.search).has('mock')) {
 			online = true;
 			frame = { src: FIXTURE, width: 412, height: 839 };
-			api.browser.state().then(setState);
+			api.browser.state(applicationId).then(setState);
 			return;
 		}
 
 		api.browser
-			.state()
+			.state(applicationId)
 			.then(setState)
 			.catch(() => {});
-		const source = new EventSource('/api/browser/stream');
+		const source = new EventSource(
+			applicationId
+				? `/api/browser/stream?applicationId=${encodeURIComponent(applicationId)}`
+				: '/api/browser/stream'
+		);
 		source.onopen = () => (online = true);
 		source.onerror = () => (online = false);
 		source.addEventListener('frame', (event) => {
 			const data = JSON.parse((event as MessageEvent).data) as BrowserFrame;
+			trouble = null;
 			frame = {
 				src: `data:image/jpeg;base64,${data.jpeg}`,
 				width: data.width,
@@ -96,21 +112,69 @@
 	});
 
 	// "Precisa de você": a página que o agente deixou passa para as mãos do usuário.
+	// Depois de um restart do servidor a aba pode não existir mais (409 browser_closed)
+	// até o servidor reabri-la: tenta algumas vezes antes de desistir.
+	let alive = true;
+	let taking = false;
+	$effect(() => () => {
+		alive = false;
+	});
+
+	async function take() {
+		if (taking) return;
+		taking = true;
+		let done = false;
+		for (let round = 0; round < 4 && alive && !done; round += 1) {
+			try {
+				setState(await api.browser.open(undefined, applicationId));
+				notice = null;
+				done = true;
+			} catch (error) {
+				if (error instanceof ApiError && error.code === 'agent_in_control') {
+					notice = 'O agente está no controle agora. Aguarde ele terminar.';
+					done = true;
+				} else {
+					if (!frame) trouble = 'reopening';
+					await new Promise((resolve) => setTimeout(resolve, 2000));
+				}
+			}
+		}
+		taking = false;
+		if (!alive) return;
+		if (!done) trouble = 'failed';
+		else if (trouble === 'reopening') trouble = null;
+	}
+
 	let tookOver = false;
 	$effect(() => {
 		if (!takeover || tookOver || mode !== 'control') return;
 		tookOver = true;
-		api.browser
-			.open()
-			.then(setState)
-			.catch(() => (notice = 'Não deu para assumir o controle do browser.'));
+		void take();
 	});
+
+	// Página esperada e nenhum frame em 8 s: mostra a falha em vez de uma área em branco.
+	$effect(() => {
+		void attempt;
+		if (frame || trouble === 'failed' || !(takeover || remote?.open)) return;
+		const timer = setTimeout(() => {
+			if (!frame && !taking) trouble = 'failed';
+		}, 8000);
+		return () => clearTimeout(timer);
+	});
+
+	function retry() {
+		trouble = null;
+		notice = null;
+		attempt += 1;
+		if (takeover && mode === 'control') void take();
+		else if (lastUrl) void open(lastUrl);
+	}
 
 	// Os comandos saem em fila, na ordem em que o usuário os fez.
 	let chain: Promise<unknown> = Promise.resolve();
 	function send(input: BrowserInput) {
 		chain = chain
-			.then(() => api.browser.input(input))
+			.then(() => api.browser.input(input, applicationId))
 			.then(() => (notice = null))
 			.catch((error) => {
 				notice =
@@ -126,7 +190,9 @@
 		opening = true;
 		notice = null;
 		try {
-			setState(await api.browser.open(/^https?:\/\//i.test(clean) ? clean : `https://${clean}`));
+			lastUrl = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+			trouble = null;
+			setState(await api.browser.open(lastUrl, applicationId));
 			urlOpen = false;
 			url = '';
 		} catch {
@@ -290,6 +356,36 @@
 					style="height: {fullHeight}px; transform: translateY({-pan}px)"
 					draggable="false"
 				/>
+			{:else if trouble === 'failed'}
+				<div
+					class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
+					role="alert"
+				>
+					<span class="text-danger"><Icon name="alert" size={28} /></span>
+					<p class="font-medium">Não consegui abrir a página</p>
+					<button type="button" class="btn" onclick={retry}>
+						<Icon name="refresh" size={20} />
+						Tentar de novo
+					</button>
+					{#if fallbackUrl}
+						<a
+							href={fallbackUrl}
+							target="_blank"
+							rel="noopener noreferrer external"
+							class="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary-deep underline decoration-primary/40 underline-offset-4"
+						>
+							Abrir a vaga no site <Icon name="external" size={16} />
+						</a>
+					{/if}
+				</div>
+			{:else if trouble === 'reopening'}
+				<div
+					class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
+					role="status"
+				>
+					<span class="spin text-primary"><Icon name="refresh" size={28} /></span>
+					<p class="text-sm leading-snug">Reabrindo a página…</p>
+				</div>
 			{:else}
 				<div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
 					<span class="text-ink-soft"><Icon name="globe" size={28} /></span>
@@ -442,6 +538,14 @@
 		-webkit-user-drag: none;
 		-webkit-touch-callout: none;
 		pointer-events: none;
+	}
+	.spin {
+		animation: spin 1.1s linear infinite;
+	}
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 	.ripple {
 		position: absolute;

@@ -65,7 +65,7 @@ export const applicationQuery = (id: string, streaming = false) =>
 	});
 
 export const browserStateQuery = () =>
-	queryOptions({ queryKey: keys.browser, queryFn: api.browser.state, enabled: browser });
+	queryOptions({ queryKey: keys.browser, queryFn: () => api.browser.state(), enabled: browser });
 
 export const profileQuery = () =>
 	queryOptions({

@@ -92,6 +92,9 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 	);
 }
 
+const tab = (applicationId?: string) =>
+	applicationId ? `?applicationId=${encodeURIComponent(applicationId)}` : '';
+
 export const api = {
 	resume: {
 		get: () => call<Resume>('GET', '/api/resume'),
@@ -150,10 +153,14 @@ export const api = {
 			call<SavedAnswer[]>('DELETE', `/api/profile/answers/${encodeURIComponent(id)}`)
 	},
 	browser: {
-		state: () => call<BrowserState>('GET', '/api/browser/state'),
+		// `applicationId` aponta para a aba daquela inscrição; sem ele, a aba padrão do usuário.
+		state: (applicationId?: string) =>
+			call<BrowserState>('GET', `/api/browser/state${tab(applicationId)}`),
 		/** Com url: abre e dá o controle ao usuário. Sem url: assume o controle da página atual. */
-		open: (url?: string) => call<BrowserState>('POST', '/api/browser/open', url ? { url } : {}),
-		input: (input: BrowserInput) => call<unknown>('POST', '/api/browser/input', input),
+		open: (url?: string, applicationId?: string) =>
+			call<BrowserState>('POST', `/api/browser/open${tab(applicationId)}`, url ? { url } : {}),
+		input: (input: BrowserInput, applicationId?: string) =>
+			call<unknown>('POST', `/api/browser/input${tab(applicationId)}`, input),
 		close: () => call<BrowserState>('POST', '/api/browser/close', {})
 	}
 };

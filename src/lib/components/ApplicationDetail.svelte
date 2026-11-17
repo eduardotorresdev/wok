@@ -73,6 +73,19 @@
 	);
 	const needsBrowser = $derived(waiting && !needsAnswer && !needsResume);
 
+	// Retomada automática: a verificação sumiu da tela e o agente seguiu sozinho.
+	let resumedAlone = $state(false);
+	let before: { id: string; waiting: boolean } | null = null;
+	$effect(() => {
+		const now = { id, waiting: needsBrowser };
+		if (before?.id === now.id && before.waiting && !now.waiting && !resume.isPending) {
+			resumedAlone = app?.status === 'applying' || app?.status === 'submitted';
+		} else if (before?.id !== now.id || now.waiting) {
+			resumedAlone = false;
+		}
+		before = now;
+	});
+
 	function failed(error: unknown) {
 		toast({
 			text:
@@ -122,6 +135,16 @@
 			<p class="mt-1 text-sm leading-snug text-ink-soft">{NOTE[app.status]}</p>
 		{/if}
 
+		{#if resumedAlone}
+			<p
+				class="mt-3 flex items-center gap-2 rounded-sm bg-primary-tint p-3 text-[0.9375rem] font-medium"
+				role="status"
+			>
+				<span class="text-primary"><Icon name="check" size={18} stroke={2.4} /></span>
+				Pronto, o agente continuou.
+			</p>
+		{/if}
+
 		{#if needsAnswer}
 			<section class="mt-3 rounded-sm bg-primary-tint p-4">
 				<p class="t-caption text-primary-deep">O formulário pergunta</p>
@@ -156,12 +179,20 @@
 						Resolva na tela abaixo e toque em "Continuar inscrição".
 					</span>
 				</p>
-				<div class="mt-3"><BrowserView mode="control" takeover maxHeight={0.5} /></div>
+				<div class="mt-3">
+					<BrowserView
+						mode="control"
+						takeover
+						maxHeight={0.5}
+						applicationId={app.id}
+						fallbackUrl={app.job.url}
+					/>
+				</div>
 			</section>
 		{:else if app.status === 'applying'}
 			<section class="mt-4">
 				<h3 class="t-title">Ao vivo</h3>
-				<div class="mt-2"><BrowserView mode="watch" maxHeight={0.42} /></div>
+				<div class="mt-2"><BrowserView mode="watch" maxHeight={0.42} applicationId={app.id} /></div>
 			</section>
 		{:else if app.status === 'failed'}
 			<p class="mt-3 rounded-sm bg-danger-tint p-3 text-[0.9375rem] leading-snug text-danger">

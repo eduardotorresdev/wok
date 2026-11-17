@@ -1,4 +1,4 @@
-import { browser, dev } from '$app/env';
+import { browser } from '$app/env';
 import type {
 	Application,
 	BrowserInput,
@@ -28,11 +28,12 @@ const NOT_BUILT_YET = new Set([404, 405, 501]);
 
 /** Em dev, `?mock` na URL força as fixtures mesmo com a rota real no ar. */
 function forcedMock() {
-	return dev && browser && new URLSearchParams(location.search).has('mock');
+	return browser && new URLSearchParams(location.search).has('mock');
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-	if (forcedMock() && !path.startsWith('/api/auth')) {
+	// import.meta.env.DEV é trocado por `false` no build: as fixtures nem entram no bundle.
+	if (import.meta.env.DEV && forcedMock() && /^\/api\/(jobs|applications|browser)\b/.test(path)) {
 		const { mock } = await import('./mock.ts');
 		return mock(method, path, body) as Promise<T>;
 	}
@@ -56,7 +57,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 		.catch(() => null);
 	const known = payload?.error as { code?: string; message?: string } | undefined;
 
-	if (dev && NOT_BUILT_YET.has(res.status) && !known) {
+	if (import.meta.env.DEV && NOT_BUILT_YET.has(res.status) && !known) {
 		const { mock } = await import('./mock.ts');
 		return mock(method, path, body) as Promise<T>;
 	}
@@ -115,8 +116,15 @@ export const api = {
 	},
 	profile: {
 		get: () => call<Profile>('GET', '/api/profile'),
-		save: ({ updatedAt: _updatedAt, ...profile }: Profile) =>
-			call<Profile>('PUT', '/api/profile', profile),
+		save: (profile: Profile) =>
+			call<Profile>('PUT', '/api/profile', {
+				...profile,
+				updatedAt: undefined,
+				// Linhas deixadas em branco nas listas não vão para o servidor.
+				workAuthorization: profile.workAuthorization.filter((item) => item.country.trim()),
+				languages: profile.languages.filter((item) => item.language.trim()),
+				certifications: profile.certifications.filter((item) => item.name.trim())
+			}),
 		answers: () => call<SavedAnswer[]>('GET', '/api/profile/answers'),
 		deleteAnswer: (id: string) =>
 			call<SavedAnswer[]>('DELETE', `/api/profile/answers/${encodeURIComponent(id)}`)

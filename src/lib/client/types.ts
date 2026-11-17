@@ -61,42 +61,70 @@ export interface Preferences {
 	updatedAt?: string | null;
 }
 
+export interface SalaryRange {
+	min: number | null;
+	max: number | null;
+}
+
 export interface Profile {
 	fullName: string;
 	phone: string;
 	city: string;
 	country: string;
 	linkedinUrl: string;
-	portfolioUrl: string;
+	portfolioLinks: string[];
+	/** Valores mensais. */
 	salary: {
-		min: number | null;
-		max: number | null;
 		currency: string;
-		regime: 'clt' | 'pj' | 'outro' | '';
+		preferredRegime: 'clt' | 'pj' | 'outro' | '';
+		clt: SalaryRange;
+		pj: SalaryRange;
 	};
 	availability: string;
 	workAuthorization: { country: string; authorized: boolean; note: string }[];
 	workModel: 'remote' | 'hybrid' | 'onsite' | 'any';
 	willingToRelocate: boolean;
 	languages: { language: string; level: string }[];
+	professionalRegistration: { number: string; state: string; status: string };
+	certifications: { name: string; validUntil: string }[];
+	shifts: string[];
+	confidential: string[];
 	updatedAt?: string | null;
 }
 
-export const EMPTY_PROFILE: Profile = {
+export const emptyProfile = (): Profile => ({
 	fullName: '',
 	phone: '',
 	city: '',
 	country: '',
 	linkedinUrl: '',
-	portfolioUrl: '',
-	salary: { min: null, max: null, currency: 'BRL', regime: '' },
+	portfolioLinks: [],
+	salary: {
+		currency: 'BRL',
+		preferredRegime: '',
+		clt: { min: null, max: null },
+		pj: { min: null, max: null }
+	},
 	availability: '',
 	workAuthorization: [],
 	workModel: 'any',
 	willingToRelocate: false,
 	languages: [],
+	professionalRegistration: { number: '', state: '', status: '' },
+	certifications: [],
+	shifts: [],
+	confidential: [],
 	updatedAt: null
-};
+});
+
+export const emptyPreferences = (): Preferences => ({
+	terms: [],
+	locations: [],
+	remote: false,
+	area: '',
+	seniority: '',
+	updatedAt: null
+});
 
 export interface SavedAnswer {
 	id: string;

@@ -36,6 +36,8 @@ export interface BrowserState {
 	 * offer: the person applies there by themselves.
 	 */
 	glassdoorManual: boolean;
+	/** Same counter as in the frames: tells which page a frame belongs to. */
+	nav: number;
 	/** The page is still being opened (the browser may be starting); frames follow on the stream. */
 	loading: boolean;
 	/** Why the last attempt to open a page failed, in Portuguese; null when it did not. */
@@ -47,6 +49,10 @@ export interface Frame {
 	jpeg: string;
 	width: number;
 	height: number;
+	/** Address of the page this frame shows. */
+	url: string;
+	/** Goes up at every navigation of the tab, including reopening the same address. */
+	nav: number;
 }
 
 export type BrowserEvent = { type: 'frame'; frame: Frame } | { type: 'state'; state: BrowserState };
@@ -77,6 +83,7 @@ interface Tab {
 	lastFrame: Frame | null;
 	controller: Controller;
 	loadError: string | null;
+	nav: number;
 }
 
 interface Session {
@@ -314,6 +321,7 @@ async function tabState(session: Session, tab: Tab): Promise<BrowserState> {
 		url: tab.page.url(),
 		title: await tab.page.title().catch(() => null),
 		viewport: VIEWPORT,
+		nav: tab.nav,
 		loading: loading.has(`${session.userId}:${tab.key}`),
 		loadError: tab.loadError,
 		...shownAccounts(await detectAccounts(session))
@@ -328,6 +336,7 @@ function closedState(userId: string, applicationId?: string | null): BrowserStat
 		url: null,
 		title: null,
 		viewport: VIEWPORT,
+		nav: 0,
 		loading: false,
 		loadError: null,
 		...shownAccounts(readAccounts(userId))
@@ -384,7 +393,9 @@ async function attachScreencast(session: Session, tab: Tab, page: Page) {
 		tab.lastFrame = {
 			jpeg: event.data,
 			width: event.metadata.deviceWidth,
-			height: event.metadata.deviceHeight
+			height: event.metadata.deviceHeight,
+			url: page.url(),
+			nav: tab.nav
 		};
 		emit(session.userId, tab.key, { type: 'frame', frame: tab.lastFrame });
 	});
@@ -400,7 +411,9 @@ function watchPage(session: Session, tab: Tab, page: Page) {
 	page.setDefaultTimeout(15_000);
 	page.setDefaultNavigationTimeout(NAV_TIMEOUT_MS);
 	page.on('framenavigated', (frame) => {
-		if (frame === page.mainFrame() && tab.page === page) void publishState(session, tab);
+		if (frame !== page.mainFrame() || tab.page !== page) return;
+		tab.nav++;
+		void publishState(session, tab);
 	});
 	page.on('close', () => {
 		tab.stack = tab.stack.filter((p) => p !== page);
@@ -432,7 +445,8 @@ async function openTab(session: Session, key: string): Promise<Tab> {
 		cdp: null,
 		lastFrame: null,
 		controller: 'idle',
-		loadError: null
+		loadError: null,
+		nav: 0
 	};
 	session.tabs.set(key, tab);
 	watchPage(session, tab, page);
@@ -600,7 +614,12 @@ function tabFor(userId: string, applicationId: string): Promise<Tab | undefined>
 			const tab = await openTab(session, applicationId);
 			tab.controller = 'user';
 			const url = await assertPublicUrl(paused.url).catch(() => null);
-			if (url) await gotoPatiently(tab.page, url).catch(() => {});
+			if (url) {
+				await showPage(tab, url).catch((err) => {
+					tab.loadError = loadErrorText(err);
+					console.error(`[browser] reopen failed: ${firstLine(err)}`);
+				});
+			}
 			onRehydrated?.(userId, applicationId);
 			return tab;
 		})().finally(() => {
@@ -695,9 +714,10 @@ function openInBackground(userId: string, key: string, url: string) {
 			tab.controller = 'user';
 			tab.loadError = null;
 			await publishState(session, tab);
-			await gotoPatiently(tab.page, url);
+			await showPage(tab, url);
 		} catch (err) {
-			error = `Não foi possível abrir a página: ${firstLine(err)}`;
+			// The person gets a plain sentence; the technical text stays in the log.
+			error = loadErrorText(err);
 			console.error(`[browser] open failed for ${new URL(url).hostname}: ${firstLine(err)}`);
 		} finally {
 			if (loading.get(id) === url) loading.delete(id);
@@ -724,15 +744,60 @@ function openInBackground(userId: string, key: string, url: string) {
 	const tracked = openQueue.get(id)!;
 }
 
-/** A navigation that failed once (a cold browser, a hiccup) gets one more try. */
-async function gotoPatiently(page: Page, url: string) {
+const ANSWER_TIMEOUT_MS = 30_000;
+const SETTLE_LIMIT_MS = 8_000;
+
+/**
+ * Opens `url` for a person. The page counts as open as soon as the site
+ * answers: a slow site may take a minute to fire its load events with the page
+ * already drawn and usable, and that is not a failure. It only throws when
+ * nothing was received at all.
+ */
+async function showPage(tab: Tab, url: string) {
+	const page = tab.page;
+	const navBefore = tab.nav;
+	const answered = () => page.goto(url, { waitUntil: 'commit', timeout: ANSWER_TIMEOUT_MS });
 	try {
-		await page.goto(url, { waitUntil: 'domcontentloaded' });
+		await answered();
 	} catch (err) {
-		if (page.isClosed()) throw err;
+		// A quick failure (a cold browser, a hiccup) gets one more try; a site that
+		// stayed silent for the whole wait does not.
+		if (page.isClosed() || /Timeout \d+ms exceeded/.test(firstLine(err))) throw err;
 		await pause(700);
-		await page.goto(url, { waitUntil: 'domcontentloaded' });
+		await answered();
 	}
+	// Loading ends at the first of: the document parsed, a frame of the new page, a limit.
+	let done = false;
+	const newFrame = (async () => {
+		while (!done && !page.isClosed() && (tab.lastFrame?.nav ?? navBefore) <= navBefore)
+			await pause(150);
+	})();
+	await Promise.race([
+		page.waitForLoadState('domcontentloaded', { timeout: SETTLE_LIMIT_MS }).catch(() => {}),
+		newFrame,
+		pause(SETTLE_LIMIT_MS)
+	]);
+	done = true;
+}
+
+/** Why a page did not open, for the person: Portuguese, no technical text. */
+export function loadErrorText(err: unknown) {
+	const raw = err instanceof Error ? err.message : String(err);
+	if (/ERR_NAME_NOT_RESOLVED|ERR_INVALID_URL|ENOTFOUND/.test(raw))
+		return 'Endereço não encontrado.';
+	if (/ERR_CONNECTION_REFUSED|ECONNREFUSED/.test(raw)) return 'O site recusou a conexão.';
+	if (
+		/ERR_INTERNET_DISCONNECTED|ERR_NETWORK_|ERR_ADDRESS_UNREACHABLE|ERR_PROXY|EAI_AGAIN/.test(raw)
+	)
+		return 'O servidor do WOK está sem internet no momento. Tente de novo em instantes.';
+	if (/Timeout \d+ms exceeded|ERR_TIMED_OUT|ERR_CONNECTION_TIMED_OUT|ETIMEDOUT/.test(raw))
+		return 'A página demorou demais para responder. Tente de novo.';
+	if (/ERR_CONNECTION_(RESET|CLOSED|ABORTED)|ERR_EMPTY_RESPONSE|ERR_HTTP2|ERR_QUIC/.test(raw))
+		return 'A conexão com o site caiu. Tente de novo.';
+	if (/ERR_CERT|ERR_SSL/.test(raw)) return 'O site não tem uma conexão segura válida.';
+	if (/launch|browserType|Target page, context or browser has been closed/i.test(raw))
+		return 'Não consegui iniciar o navegador. Tente de novo.';
+	return 'Não foi possível abrir a página. Tente de novo.';
 }
 
 /** Lets the user act on a tab that is already open (the page a paused application left). */
@@ -768,16 +833,16 @@ export async function userInput(
 	input: UserInput,
 	applicationId?: string | null
 ): Promise<BrowserState> {
+	// While a page is on its way, what is on screen is the previous one: a tap
+	// now would land on a page the person is no longer looking at.
+	if (loading.has(`${userId}:${applicationId ?? USER_TAB}`)) {
+		throw new ApiError(409, 'browser_loading', 'A página ainda está abrindo.');
+	}
 	const tab = applicationId
 		? await tabFor(userId, applicationId)
 		: resolveTab(sessions.get(userId), null);
 	const session = sessions.get(userId);
-	if (!session || !tab) {
-		if (loading.has(`${userId}:${applicationId ?? USER_TAB}`)) {
-			throw new ApiError(409, 'browser_loading', 'A página ainda está abrindo.');
-		}
-		throw new ApiError(409, 'browser_closed', 'Esta aba não está aberta.');
-	}
+	if (!session || !tab) throw new ApiError(409, 'browser_closed', 'Esta aba não está aberta.');
 	if (tab.controller !== 'user') {
 		throw new ApiError(
 			409,

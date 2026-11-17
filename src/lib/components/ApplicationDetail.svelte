@@ -5,6 +5,7 @@
 <script lang="ts">
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { browser } from '$app/env';
+	import { resolve } from '$app/paths';
 	import { ApiError } from '#lib/client/api.ts';
 	import { clockTime, sourceLabel } from '#lib/client/format.ts';
 	import {
@@ -63,8 +64,14 @@
 		};
 	});
 
-	const needsBrowser = $derived(app?.status === 'needs_user' && app.needsKind !== 'question');
-	const needsAnswer = $derived(app?.status === 'needs_user' && app.needsKind === 'question');
+	const waiting = $derived(app?.status === 'needs_user');
+	const needsAnswer = $derived(waiting && app?.needsKind === 'question' && !!app.pendingQuestion);
+	// Currículo base não compila ou o ajuste não coube em uma página: conserta-se no editor.
+	const needsResume = $derived(
+		waiting &&
+			(app?.needsKind === 'resume' || (app?.needsKind === 'question' && !app.pendingQuestion))
+	);
+	const needsBrowser = $derived(waiting && !needsAnswer && !needsResume);
 
 	function failed(error: unknown) {
 		toast({
@@ -130,6 +137,16 @@
 				<p class="t-caption mt-2">
 					A resposta fica salva e o agente reutiliza nas próximas inscrições.
 				</p>
+			</section>
+		{:else if needsResume}
+			<section class="mt-3 rounded-sm bg-primary-tint p-4">
+				<p class="text-[0.9375rem] leading-snug">
+					{app.lastMessage ?? 'O currículo precisa de um ajuste antes de seguir.'}
+				</p>
+				<a href={resolve('/(app)/curriculo')} class="btn btn-quiet mt-3">
+					<Icon name="doc" size={20} />
+					Abrir currículo
+				</a>
 			</section>
 		{:else if needsBrowser}
 			<section class="mt-3">
@@ -211,6 +228,11 @@
 					onclick={sendAnswer}
 				>
 					Responder e continuar
+				</button>
+			{:else if needsResume}
+				<button type="button" class="btn w-full" disabled={resume.isPending} onclick={carryOn}>
+					<Icon name="refresh" size={20} />
+					Tentar de novo
 				</button>
 			{:else if needsBrowser}
 				<button type="button" class="btn w-full" disabled={resume.isPending} onclick={carryOn}>

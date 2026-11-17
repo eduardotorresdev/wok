@@ -45,7 +45,7 @@ export interface Application {
 	tailoredPdfUrl: string | null;
 	lastMessage: string | null;
 	/** Em needs_user: 'question' (responder) ou 'browser' (agir no browser e continuar). */
-	needsKind: 'question' | 'browser' | null;
+	needsKind: 'question' | 'browser' | 'resume' | null;
 	pendingQuestion: string | null;
 	createdAt: string;
 	updatedAt: string;

@@ -105,9 +105,7 @@
 							</span>
 							{#if app.status === 'needs_user'}
 								<span class="mt-1.5 block text-sm leading-snug">
-									{app.needsKind === 'question'
-										? (app.pendingQuestion ?? 'O formulário tem uma pergunta para você.')
-										: (app.lastMessage ?? 'O site pediu login ou verificação.')}
+									{app.pendingQuestion ?? app.lastMessage ?? 'Abra para ver o que falta.'}
 								</span>
 							{:else if app.lastMessage && app.status !== 'submitted' && app.status !== 'queued'}
 								<span class="mt-1.5 line-clamp-1 block text-sm leading-snug text-ink-soft">

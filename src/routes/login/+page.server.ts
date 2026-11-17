@@ -8,7 +8,8 @@ import type { PageServerLoad } from './$types';
  */
 export const load: PageServerLoad = ({ locals, url }) => {
 	let next = '/';
-	let error = url.searchParams.get('error');
+	// better-auth acrescenta ?error=CODIGO; a página de confirmação do link marca ?erro=link.
+	let error = url.searchParams.get('error') ?? url.searchParams.get('erro');
 
 	const raw = url.searchParams.get('next');
 	if (raw && raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/login')) {
@@ -29,7 +30,7 @@ export const load: PageServerLoad = ({ locals, url }) => {
 			? null
 			: /expired/i.test(error)
 				? ('expired' as const)
-				: /token|attempt/i.test(error)
+				: /token|attempt|link/i.test(error)
 					? ('used' as const)
 					: ('failed' as const)
 	};

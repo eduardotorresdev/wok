@@ -48,8 +48,15 @@
 		const size = remote?.viewport ?? frame;
 		return size && size.width > 0 ? size.height / size.width : 2.04;
 	});
-	const screenHeight = $derived(Math.min(viewportHeight * maxHeight, boxWidth * ratio));
-	const screenWidth = $derived(screenHeight / ratio);
+	// A página remota ocupa a largura toda (dá para ler e tocar); o que não cabe
+	// na altura fica fora da janela e aparece arrastando.
+	const fullHeight = $derived(boxWidth * ratio);
+	const screenHeight = $derived(Math.min(viewportHeight * maxHeight, fullHeight));
+	const maxPan = $derived(Math.max(0, fullHeight - screenHeight));
+	let pan = $state(0);
+	$effect(() => {
+		if (pan > maxPan) pan = maxPan;
+	});
 
 	function setState(state: BrowserState) {
 		remote = state;
@@ -140,35 +147,45 @@
 
 	function point(event: PointerEvent) {
 		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-		const size = remote?.viewport ?? frame ?? { width: rect.width, height: rect.height };
+		const size = remote?.viewport ?? frame ?? { width: rect.width, height: fullHeight };
 		const px = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
 		const py = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
 		return {
 			x: Math.round((px / rect.width) * size.width),
-			y: Math.round((py / rect.height) * size.height),
-			scale: size.height / rect.height,
+			y: Math.round(((py + pan) / fullHeight) * size.height),
+			scale: size.width / rect.width,
 			px,
 			py
 		};
 	}
 
 	function down(event: PointerEvent) {
-		if (!canControl || !event.isPrimary) return;
+		if (!event.isPrimary || !frame) return;
 		pointer = event.pointerId;
 		startX = event.clientX;
 		startY = lastY = event.clientY;
 		scrolling = false;
 		pending = 0;
-		(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+		try {
+			(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		} catch {
+			// ponteiro sintético ou já solto
+		}
 	}
 
 	function move(event: PointerEvent) {
 		if (event.pointerId !== pointer) return;
 		if (!scrolling && Math.hypot(event.clientX - startX, event.clientY - startY) < 10) return;
 		scrolling = true;
-		const at = point(event);
-		pending += (lastY - event.clientY) * at.scale;
+		const delta = lastY - event.clientY;
 		lastY = event.clientY;
+		// Primeiro anda a janela local; o que sobrar rola a página remota.
+		const next = Math.max(0, Math.min(maxPan, pan + delta));
+		const rest = delta - (next - pan);
+		pan = next;
+		if (!canControl || rest === 0) return;
+		const at = point(event);
+		pending += rest * at.scale;
 		flushTimer ??= setTimeout(() => {
 			flushTimer = undefined;
 			if (Math.abs(pending) >= 1)
@@ -180,7 +197,7 @@
 	function up(event: PointerEvent) {
 		if (event.pointerId !== pointer) return;
 		pointer = null;
-		if (scrolling) return;
+		if (scrolling || !canControl) return;
 		const at = point(event);
 		send({ type: 'tap', x: at.x, y: at.y });
 		const ripple = { id: Date.now(), x: at.px, y: at.py };
@@ -250,11 +267,12 @@
 	</div>
 
 	<!-- Tela remota -->
-	<div class="flex justify-center rounded-b-md bg-band py-2">
+	<div class="rounded-b-md border border-t-0 border-line">
 		<div
-			class="screen relative overflow-hidden rounded-sm bg-paper shadow-paper"
+			class="screen relative w-full overflow-hidden rounded-b-md bg-paper"
 			class:control={canControl}
-			style="width: {screenWidth}px; height: {screenHeight}px"
+			class:pannable={maxPan > 0}
+			style="height: {screenHeight}px"
 			role={canControl ? 'application' : 'img'}
 			aria-label={canControl
 				? 'Tela do browser remoto: toque para clicar, arraste para rolar'
@@ -265,7 +283,13 @@
 			onpointercancel={() => (pointer = null)}
 		>
 			{#if frame}
-				<img src={frame.src} alt="" class="block h-full w-full select-none" draggable="false" />
+				<img
+					src={frame.src}
+					alt=""
+					class="block w-full select-none"
+					style="height: {fullHeight}px; transform: translateY({-pan}px)"
+					draggable="false"
+				/>
 			{:else}
 				<div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
 					<span class="text-ink-soft"><Icon name="globe" size={28} /></span>
@@ -407,8 +431,11 @@
 </div>
 
 <style>
-	.screen.control {
+	.screen.control,
+	.screen.pannable {
 		touch-action: none;
+	}
+	.screen.control {
 		cursor: pointer;
 	}
 	.screen img {

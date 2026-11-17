@@ -70,9 +70,9 @@ tectonic_compiles() {
 # conta do smoke ($EMAIL, que acabou de pedir um magic link) e manda compilar um .tex que
 # faz \input de /etc/hostname e de um arquivo-canário criado ao lado do .env. Falha se o
 # hostname ou o canário aparecerem no texto do PDF ou na resposta, ou se o log do TeX
-# mostrar que abriu algum dos dois. Precisa do domínio público (cookie de sessão é Secure).
+# mostrar que abriu algum dos dois.
 latex_cannot_read_host_files() {
-	local jar body pdf tok host canary cfile code rc=0 f
+	local jar body pdf tok host canary cfile code cookie rc=0 f
 	jar="$(mktemp)"; body="$(mktemp)"; pdf="$(mktemp)"; host="$(hostname)"
 	canary="WOKCANARY$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
 	cfile="$APP_ROOT/shared/smoke-canary.txt"
@@ -83,16 +83,20 @@ latex_cannot_read_host_files() {
 		if (!r) process.exit(1);
 		console.log(r.identifier.split(':')[1]);
 	")" || { echo "sem token de login para $EMAIL"; rm -f "$jar" "$body" "$pdf" "$cfile"; return 1; }
-	curl -s -o /dev/null -m 30 -c "$jar" "$BASE/api/auth/magic-link/verify?token=$tok&callbackURL=%2F"
+	# Tudo por 127.0.0.1, para não depender da rede/túnel. O cookie de sessão é Secure e o
+	# curl não o reenviaria por http, então vai num cabeçalho Cookie montado a partir do jar.
+	curl -s -o /dev/null -m 30 -c "$jar" -H "Origin: $ORIGIN" "$LOCAL/api/auth/magic-link/verify?token=$tok&callbackURL=%2F"
+	cookie="$(awk -F'\t' 'NF >= 7 { sub(/^#HttpOnly_/, "", $1); printf "%s=%s; ", $6, $7 }' "$jar")"
+	[ -n "$cookie" ] || { echo "inconclusivo: login da conta do smoke não devolveu cookie"; rm -f "$jar" "$body" "$pdf" "$cfile"; return 1; }
 	for f in /etc/hostname "$cfile"; do
-		code="$(curl -s -o "$body" -m 200 -w '%{http_code}' -b "$jar" -X POST "$BASE/api/resume/compile" \
+		code="$(curl -s -o "$body" -m 200 -w '%{http_code}' -H "Cookie: $cookie" -X POST "$LOCAL/api/resume/compile" \
 			-H 'Content-Type: application/json' -H "Origin: $ORIGIN" \
 			-d "{\"latex\":\"\\\\documentclass{article}\\\\begin{document}smoke-leak-test \\\\input{$f} fim\\\\end{document}\"}")"
 		if [ "$code" != "200" ] || ! grep -q '"ok"' "$body"; then
 			echo "inconclusivo ($f): HTTP $code: $(head -c 200 "$body")"; rc=1; continue
 		fi
 		: > "$pdf"
-		curl -s -o "$pdf" -m 60 -b "$jar" "$BASE/api/resume/pdf" || true
+		curl -s -o "$pdf" -m 60 -H "Cookie: $cookie" "$LOCAL/api/resume/pdf" || true
 		if grep -qF -e "$host" -e "$canary" "$body" ||
 			pdftotext "$pdf" - 2>/dev/null | grep -qF -e "$host" -e "$canary"; then
 			echo "VAZOU: conteúdo de $f voltou no PDF ou na resposta da compilação"; rc=1

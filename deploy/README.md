@@ -100,3 +100,17 @@ O processo enxerga os binários por dois caminhos: `supervise.sh` põe
 `~/.TinyTeX/bin/x86_64-linux` no `PATH`, e o `.env` define `LATEX_BIN_DIR` com o mesmo
 diretório. O smoke roda `pdflatex --version`, compila um `.tex` mínimo com
 `microtype` + `\DisableLigatures` e confere que `~/.TinyTeX` é gravável.
+
+## Segredos e rotação
+
+`deploy/set-env.sh NOME` troca uma variável do `.env` (valor pelo stdin, nunca na linha de
+comando), guarda backup do `.env` anterior e reinicia o app se não houver trabalho em andamento.
+
+- `BETTER_AUTH_SECRET`: `deploy/set-env.sh BETTER_AUTH_SECRET --generate`. Derruba todas as
+  sessões e magic links pendentes; todo mundo entra de novo.
+- `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `APIFY_TOKEN`: o dono gera a chave nova no painel de
+  cada serviço; aqui `WOK_NO_RESTART=1 deploy/set-env.sh NOME` para cada uma e um
+  `touch ~/wok/restart` no fim. Revogar a chave antiga no painel só depois do smoke passar.
+- Token do túnel (`~/wok/shared/cloudflared.token`): rotaciona pela API/painel da Cloudflare
+  (túnel `wok`), regrava o arquivo e reinicia o conector.
+- Depois: `deploy/smoke.sh` e apagar `~/wok/shared/.env.bak-*`.

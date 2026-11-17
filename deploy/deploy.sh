@@ -58,7 +58,7 @@ ln -sfn "$REL" "$APP_ROOT/current.tmp" && mv -T "$APP_ROOT/current.tmp" "$APP_RO
 healthy() {
 	for _ in $(seq 1 45); do
 		if [ "$(cat "$APP_ROOT/running-release" 2>/dev/null)" = "$1" ] &&
-			curl -fsS -o /dev/null -m 5 "http://127.0.0.1:$PORT/api/health"; then return 0; fi
+			curl -fs -o /dev/null -m 5 "http://127.0.0.1:$PORT/api/health"; then return 0; fi
 		sleep 2
 	done
 	return 1

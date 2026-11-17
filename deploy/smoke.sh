@@ -27,6 +27,11 @@ http_is() { # url, código esperado, [args curl...]
 	[ "$got" = "$want" ] || { echo "HTTP $got (esperado $want) em $url"; return 1; }
 }
 
+redirects_to_login() { # url
+	local got; got="$(curl -s -o /dev/null -m 20 -w '%{http_code} %{redirect_url}' "$1")"
+	case "$got" in "303 "*/login*) ;; *) echo "esperado 303 -> /login, veio: $got"; return 1 ;; esac
+}
+
 magic_link() {
 	local body code
 	body="$(mktemp)"
@@ -58,11 +63,13 @@ tectonic_compiles() {
 echo "smoke em $BASE (release $(cat "$APP_ROOT/current/build/REVISION" 2>/dev/null || echo '?'))"
 # Local: prova o app em si, independente de DNS/túnel.
 check "local /api/health 200 ($LOCAL)"            http_is "$LOCAL/api/health" 200
-check "local / 200"                               http_is "$LOCAL/" 200 -L
+check "local / sem sessão -> 303 /login"          redirects_to_login "$LOCAL/"
+check "local /login 200"                          http_is "$LOCAL/login" 200
 check "local /api/auth respondendo (/api/auth/ok)" http_is "$LOCAL/api/auth/ok" 200
 check "magic link real via Resend -> $EMAIL"      magic_link
 # Público: DNS + túnel + TLS.
-check "HTTPS 200 em $BASE/"                       http_is "$BASE/" 200 -L
+check "HTTPS $BASE/ -> 303 /login"                redirects_to_login "$BASE/"
+check "HTTPS $BASE/login 200"                     http_is "$BASE/login" 200
 check "HTTPS $BASE/api/health 200"                http_is "$BASE/api/health" 200
 check "HTTPS $BASE/api/auth/ok 200"               http_is "$BASE/api/auth/ok" 200
 check "Chromium headless abre no servidor"       chromium_opens

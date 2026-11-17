@@ -31,27 +31,30 @@ Se a release nova não responder em 90s, o symlink volta para a anterior.
 `supervise.sh` mantém `node --env-file=~/wok/shared/.env build` em `127.0.0.1:3300`,
 reinicia se cair e quando `~/wok/current` muda. Restart manual: `touch ~/wok/restart`.
 
-Hoje ele roda como runner `wok-prod` do board. Para passar para systemd (sobrevive a
-reboot e a restart do agentboard), pare o runner e, num shell normal:
+Hoje ele roda como runner `wok-prod` do board. Para passar para systemd (app e túnel) (sobrevive a
+reboot e a restart do agentboard), pare os runners e, num shell normal:
 
 ```bash
 cp deploy/systemd/wok*.service deploy/systemd/wok-backup.timer ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now wok.service wok-backup.timer
+systemctl --user enable --now wok.service wok-tunnel.service wok-backup.timer
 ```
 
 ## Proxy / TLS
 
-Padrão da máquina: Cloudflare Tunnel (`/etc/cloudflared/config.yml`, root). TLS termina na
-Cloudflare. Regra necessária, antes do `http_status:404`:
+Cloudflare Tunnel próprio do app: túnel `wok` (id `218a17db-2bad-4ee2-a6f8-00174e410495`),
+gerenciado pela Cloudflare (ingress `wok.eduardotorres.dev -> http://127.0.0.1:3300` fica no
+painel/API, não em arquivo). TLS termina na Cloudflare. O túnel `runner` (SSH, config em
+`/etc/cloudflared`) não foi alterado.
 
-```yaml
-  - hostname: wok.eduardotorres.dev
-    service: http://127.0.0.1:3300
+O conector roda como usuário, hoje no runner `wok-tunnel` do board:
+
+```bash
+cloudflared tunnel --no-autoupdate run --token-file ~/wok/shared/cloudflared.token
 ```
 
-mais um CNAME proxied `wok` -> `17776be2-960b-42de-9042-6c6f2c1ac312.cfargotunnel.com`
-e `sudo systemctl restart cloudflared`.
+O token fica em `~/wok/shared/cloudflared.token` (chmod 600, fora do git). Para systemd,
+use `deploy/systemd/wok-tunnel.service` do mesmo jeito que `wok.service`.
 
 SSE (`/api/**/events`, `/api/browser/stream`): o túnel não bufferiza `text/event-stream`,
 mas a borda da Cloudflare derruba conexão com 100s sem bytes. O servidor precisa mandar

@@ -6,6 +6,7 @@ import { auth, migrateAuth } from '#lib/server/auth.ts';
 import { registerPipeline } from '#lib/server/agent/pipeline.ts';
 import { recoverQueue } from '#lib/server/applications/queue.ts';
 import { closeAll } from '#lib/server/browser/service.ts';
+import { installShutdown, onShutdown } from '#lib/server/lifecycle.ts';
 import { apiError } from '#lib/server/http.ts';
 import { failOrphanRuns } from '#lib/server/jobs/search.ts';
 
@@ -20,8 +21,9 @@ export const init: ServerInit = async () => {
 	once.__wokBooted = true;
 	failOrphanRuns();
 	recoverQueue();
-	// adapter-node emits this on SIGTERM/SIGINT; Chromium must not outlive the server.
-	process.on('sveltekit:shutdown', () => void closeAll());
+	// Closing the contexts is what writes each user's browser profile to disk.
+	onShutdown(closeAll);
+	installShutdown();
 };
 
 const PUBLIC_PREFIXES = ['/login', '/api/auth', '/api/health', '/api/login-link'];

@@ -1,3 +1,5 @@
+import { onShutdown } from './lifecycle.ts';
+
 const HEARTBEAT_MS = 20_000;
 
 export interface SseChannel {
@@ -18,10 +20,12 @@ export function sse(request: Request, start: (channel: SseChannel) => (() => voi
 
 	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {
+			let forget: () => void = () => {};
 			const finish = () => {
 				if (closed) return;
 				closed = true;
 				clearInterval(timer);
+				forget();
 				cleanup?.();
 				try {
 					controller.close();
@@ -40,6 +44,8 @@ export function sse(request: Request, start: (channel: SseChannel) => (() => voi
 			write(': connected\n\n');
 			timer = setInterval(() => write(': ping\n\n'), HEARTBEAT_MS);
 			request.signal.addEventListener('abort', finish);
+			// An open stream would keep the server from closing on shutdown.
+			forget = onShutdown(finish);
 			cleanup = start({
 				send: (event, data) => write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
 				close: finish

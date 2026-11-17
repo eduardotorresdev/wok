@@ -1,3 +1,4 @@
+import { isStopping } from '../lifecycle.ts';
 import { getRow, setStatus, unfinished } from './store.ts';
 
 type Runner = (applicationId: string) => Promise<void>;
@@ -18,9 +19,12 @@ export function enqueue(userId: string, applicationId: string) {
 	const previous = chains.get(userId) ?? Promise.resolve();
 	const next = previous
 		.then(async () => {
+			// Left as queued: the next boot picks it up.
+			if (isStopping()) return;
 			await runner!(applicationId);
 		})
 		.catch((err) => {
+			if (isStopping()) return;
 			console.error(`[queue] application ${applicationId} crashed`, err);
 			const row = getRow(applicationId);
 			if (row && row.status !== 'submitted' && row.status !== 'needs_user') {

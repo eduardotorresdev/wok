@@ -1,3 +1,4 @@
+import { isStopping } from '../lifecycle.ts';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
@@ -186,6 +187,9 @@ export function setStatus(
 	message: string,
 	extra: Partial<Pick<Row, 'needsKind' | 'pendingQuestion'>> = {}
 ) {
+	// A run cut short by shutdown fails for reasons that are not its own; the row
+	// keeps its last status and the next boot puts it back in the queue.
+	if (isStopping()) return null;
 	logStep(applicationId, 'status', message, { status });
 	return update(applicationId, {
 		status,

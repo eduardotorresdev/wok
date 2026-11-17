@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import type { ProfileData } from '../db/schema.ts';
-import { compileLatex, latexErrors, type CompileResult } from '../latex.ts';
+import { compileLatex, type CompileResult } from '../latex.ts';
 import { EFFORT, LlmRefusal, MODEL, anthropic } from './llm.ts';
 import { matchArea, playbooks } from './playbooks.ts';
 
@@ -66,7 +66,7 @@ Reescreva o currículo base seguindo os playbooks abaixo e chame compile_resume 
 
 ## Sobre a compilação
 
-O servidor compila com Tectonic (motor XeTeX), sem shell-escape, baixando pacotes do CTAN sob demanda. Consequências práticas: primitivas exclusivas do pdfTeX como \\pdfgentounicode e \\input{glyphtounicode} não existem aqui (o XeTeX já grava o mapeamento Unicode); se o currículo base as usa, proteja com \\ifdefined\\pdfgentounicode ... \\fi em vez de remover, para o arquivo continuar compilando em pdfLaTeX. Mantenha coluna única e texto real (nada de texto em imagem), para a extração sair limpa. Confira no texto extraído que acentos, e-mail, telefone e links estão legíveis e na ordem certa de leitura. Se o log acusar caractere sem glifo, troque o caractere por um equivalente que a fonte tenha (por exemplo "--" no lugar de um travessão Unicode).`,
+O servidor escolhe o motor pelo fonte: pdfLaTeX por padrão (inputenc/fontenc, \\pdfgentounicode, \\input{glyphtounicode}, microtype com \\DisableLigatures funcionam normalmente) e XeLaTeX ou LuaLaTeX só quando o fonte carrega fontspec, unicode-math ou polyglossia. Roda sem shell-escape, e pacote ausente do TeX Live é instalado sob demanda. Mantenha o motor do currículo base: não troque o preâmbulo de pdfLaTeX por fontspec nem o contrário, e não remova linhas do preâmbulo do usuário para "consertar" a compilação. Mantenha coluna única e texto real (nada de texto em imagem), para a extração sair limpa. Confira no texto extraído que acentos, e-mail, telefone e links estão legíveis e na ordem certa de leitura. Se o log acusar caractere sem glifo, troque o caractere por um equivalente que a fonte tenha (por exemplo "--" no lugar de um travessão Unicode).`,
 		`# Playbook: currículo\n\n${playbooks.resume()}`,
 		`# Playbook: adaptação à vaga\n\n${playbooks.tailoring()}`
 	];
@@ -94,7 +94,7 @@ function userMessage(input: TailorInput) {
 
 function describe(result: CompileResult): string {
 	if (!result.ok) {
-		const errors = latexErrors(result.log);
+		const errors = [result.explanation, ...result.errors].filter(Boolean).join('\n');
 		return `Não compilou.\n\nErros:\n${errors || result.log.slice(-3000)}`;
 	}
 	const lines = [`Compilou: ${result.pages} página${result.pages === 1 ? '' : 's'}.`];

@@ -58,7 +58,9 @@ export async function compileResume(userId: string) {
 			ok: result.ok,
 			pages: result.pages,
 			pdfUrl: result.ok ? `/api/resume/pdf?v=${hash.slice(0, 12)}` : null,
-			log: result.log
+			log: result.log,
+			explanation: result.explanation,
+			errors: result.errors
 		};
 	});
 }

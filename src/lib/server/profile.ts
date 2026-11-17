@@ -59,7 +59,8 @@ export const ProfileInput = z.object({
 		.max(30)
 		.default([]),
 	shifts: z.array(short.min(1)).max(10).default([]),
-	confidential: z.array(z.string().trim().min(1).max(300)).max(30).default([])
+	confidential: z.array(z.string().trim().min(1).max(300)).max(30).default([]),
+	notifyEmail: z.boolean().default(true)
 });
 
 export interface ProfileDto extends ProfileData {

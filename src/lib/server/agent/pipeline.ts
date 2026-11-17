@@ -19,6 +19,7 @@ import { db, schema, sqlite } from '../db/index.ts';
 import { compileLatex, userDir } from '../latex.ts';
 import { applyVia } from '../jobs/feed.ts';
 import { getPreferences } from '../preferences.ts';
+import { sendNeedsUserEmail } from '../email.ts';
 import { config } from '../env.ts';
 import { getProfile, listAnswers, missingProfileQuestion } from '../profile.ts';
 import { compileResume, getResume, getResumeRow } from '../resume.ts';
@@ -273,8 +274,46 @@ function pausedTab(userId: string, applicationId: string) {
 	return url ? { url } : null;
 }
 
+const NOTIFY_AGAIN_MS = 30 * 60_000;
+
+/**
+ * One email per pause. Resuming and stopping again for the very same reason
+ * within half an hour is not a new pause worth another message.
+ */
+async function notifyIfPaused(applicationId: string) {
+	const app = getRow(applicationId);
+	if (!app || app.status !== 'needs_user' || !app.lastMessage) return;
+	if (!getProfile(app.userId).notifyEmail) return;
+	const reason = app.lastMessage;
+	const repeated = listSteps(applicationId).some(
+		(s) =>
+			s.kind === 'notify_email' &&
+			s.data?.reason === reason &&
+			Date.now() - Date.parse(s.createdAt) < NOTIFY_AGAIN_MS
+	);
+	if (repeated) return;
+	const user = sqlite().prepare('select email from user where id = ?').get(app.userId) as
+		{ email: string } | undefined;
+	const job = db().select().from(schema.job).where(eq(schema.job.id, app.jobId)).get();
+	if (!user?.email || !job) return;
+	try {
+		await sendNeedsUserEmail(user.email, {
+			company: job.company,
+			title: job.title,
+			reason,
+			url: `${config.baseUrl}/inscricoes?open=${encodeURIComponent(applicationId)}`
+		});
+		logStep(applicationId, 'notify_email', 'Avisei você por email.', { reason });
+	} catch (err) {
+		console.error(`[notify] application ${applicationId}`, err);
+	}
+}
+
 export function registerPipeline() {
-	setRunner(runApplication);
+	setRunner(async (applicationId) => {
+		await runApplication(applicationId);
+		await notifyIfPaused(applicationId);
+	});
 	// After a restart nothing is watching paused applications; the watch comes back
 	// together with the tab, when the person opens the viewer, not before.
 	setPausedTabSource(pausedTab, (userId, applicationId) => {

@@ -138,6 +138,8 @@ export interface ProfileData {
 	shifts: string[];
 	/** What must never appear in a résumé or form (client names, confidential figures). */
 	confidential: string[];
+	/** Email the person when an application pauses and needs them. */
+	notifyEmail: boolean;
 }
 
 export const profile = sqliteTable('profile', {

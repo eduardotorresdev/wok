@@ -39,6 +39,17 @@ export const config = {
 		return Number.isFinite(days) && days >= 1 ? Math.floor(days) : 14;
 	},
 	/**
+	 * With AUTH_ALLOWED_EMAILS set (comma-separated), only those addresses can
+	 * sign in; empty means anyone can, as before.
+	 */
+	emailAllowed(email: string) {
+		const allowed = (privateEnv.AUTH_ALLOWED_EMAILS || '')
+			.split(',')
+			.map((e) => e.trim().toLowerCase())
+			.filter(Boolean);
+		return !allowed.length || allowed.includes(email.trim().toLowerCase());
+	},
+	/**
 	 * Glassdoor's own application flow sits behind a human check that our
 	 * browser does not get past. `manual` (default) tailors the résumé and hands
 	 * the application to the person; `auto` lets the applier try the site.

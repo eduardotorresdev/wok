@@ -21,6 +21,8 @@ function createAuth() {
 			magicLink({
 				expiresIn: 60 * 15,
 				sendMagicLink: async ({ email, url, token }) => {
+					// Not on the list: answer exactly like a sent link, so the list is not revealed.
+					if (!config.emailAllowed(email)) return;
 					// Email the confirmation page, not the verify endpoint: see /api/login-link.
 					const callback = new URL(url).searchParams.get('callbackURL') ?? '/';
 					const link = new URL('/api/login-link', config.baseUrl);

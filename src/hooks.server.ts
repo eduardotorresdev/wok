@@ -7,6 +7,7 @@ import { registerPipeline } from '#lib/server/agent/pipeline.ts';
 import { recoverQueue } from '#lib/server/applications/queue.ts';
 import { closeAll } from '#lib/server/browser/service.ts';
 import { installShutdown, onShutdown } from '#lib/server/lifecycle.ts';
+import { config } from '#lib/server/env.ts';
 import { apiError } from '#lib/server/http.ts';
 import { failOrphanRuns } from '#lib/server/jobs/search.ts';
 
@@ -36,8 +37,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (building) return resolve(event);
 
 	const session = await auth().api.getSession({ headers: event.request.headers });
-	event.locals.user = session?.user ?? null;
-	event.locals.session = session?.session ?? null;
+	// A session opened before the address left AUTH_ALLOWED_EMAILS stops counting.
+	const allowed = !!session && config.emailAllowed(session.user.email);
+	event.locals.user = allowed ? session.user : null;
+	event.locals.session = allowed ? session.session : null;
 
 	const { pathname } = event.url;
 	if (!event.locals.user && !isPublic(pathname)) {

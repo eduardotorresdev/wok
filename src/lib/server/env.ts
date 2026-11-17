@@ -39,6 +39,14 @@ export const config = {
 		return Number.isFinite(days) && days >= 1 ? Math.floor(days) : 14;
 	},
 	/**
+	 * Glassdoor's own application flow sits behind a human check that our
+	 * browser does not get past. `manual` (default) tailors the résumé and hands
+	 * the application to the person; `auto` lets the applier try the site.
+	 */
+	get glassdoorApply(): 'manual' | 'auto' {
+		return (privateEnv.GLASSDOOR_APPLY || '').toLowerCase() === 'auto' ? 'auto' : 'manual';
+	},
+	/**
 	 * Rehearsal mode: the applier fills everything but never presses the final
 	 * submit. APPLY_DRY_RUN=1 turns it on for everyone (development);
 	 * APPLY_DRY_RUN_EMAILS limits it to the listed accounts, so QA can rehearse

@@ -17,6 +17,7 @@ import {
 } from '../browser/service.ts';
 import { db, schema, sqlite } from '../db/index.ts';
 import { compileLatex, userDir } from '../latex.ts';
+import { applyVia } from '../jobs/feed.ts';
 import { getPreferences } from '../preferences.ts';
 import { config } from '../env.ts';
 import { getProfile, listAnswers, missingProfileQuestion } from '../profile.ts';
@@ -127,6 +128,17 @@ async function runApplication(applicationId: string) {
 	}
 
 	// ------------------------------------------------------------ applying
+	// Opening Glassdoor only to hit its human check would spend applier calls for
+	// nothing: the tailored résumé is ready, and the person finishes on the site.
+	if (applyVia(job) === 'glassdoor' && config.glassdoorApply === 'manual') {
+		setLastUrl(applicationId, job.url);
+		return void setStatus(
+			applicationId,
+			'needs_user',
+			'Currículo adaptado e pronto. O Glassdoor exige uma verificação humana que não passa no navegador do WOK, e eu não a contorno. Abra a vaga no Glassdoor no seu próprio navegador, envie a candidatura com o PDF adaptado desta inscrição e depois marque como enviada.',
+			{ needsKind: 'browser' }
+		);
+	}
 	const history = listSteps(applicationId)
 		.filter((s) => ['action', 'status', 'user_answer'].includes(s.kind))
 		.slice(-25)
@@ -205,11 +217,26 @@ async function runApplication(applicationId: string) {
 				`Pronto para enviar (modo de teste, nada foi enviado). ${outcome.message}`,
 				{ needsKind: 'browser' }
 			);
-		case 'needs_browser':
-			setStatus(applicationId, 'needs_user', outcome.message, { needsKind: 'browser' });
+		case 'needs_browser': {
+			// Glassdoor's own flow sits behind a human check the agent never solves:
+			// say so plainly and offer the way out that does not depend on it.
+			const onGlassdoor = /(^|\.)glassdoor\./i.test(hostOf(browser?.url() ?? ''));
+			const message = onGlassdoor
+				? `O Glassdoor pediu uma verificação humana, e isso eu não resolvo por você. Há duas saídas: (1) resolva a verificação no navegador aqui embaixo e eu continuo sozinho; (2) abra a vaga no site, envie você mesmo com o currículo adaptado (o PDF desta inscrição) e marque como enviada. Detalhe: ${outcome.message}`
+				: outcome.message;
+			setStatus(applicationId, 'needs_user', message, { needsKind: 'browser' });
 			return void resumeWhenBarrierClears(userId, applicationId);
+		}
 		case 'failed':
 			return void setStatus(applicationId, 'failed', outcome.message);
+	}
+}
+
+function hostOf(url: string) {
+	try {
+		return new URL(url).hostname;
+	} catch {
+		return '';
 	}
 }
 

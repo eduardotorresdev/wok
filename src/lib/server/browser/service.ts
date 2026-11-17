@@ -582,6 +582,7 @@ export async function userInput(
 	try {
 		switch (input.type) {
 			case 'tap':
+				void logTap(page, input.x, input.y);
 				await page.touchscreen.tap(input.x, input.y);
 				break;
 			case 'type':
@@ -605,6 +606,34 @@ export async function userInput(
 		throw new ApiError(422, 'input_failed', `Ação não pôde ser executada: ${firstLine(err)}`);
 	}
 	return tabState(session, tab);
+}
+
+/**
+ * Diagnostic only (server log, never shown to the user): what sits under a tap
+ * and where the page is three seconds later, to tell a tap that missed from a
+ * tap the site ignored.
+ */
+async function logTap(page: Page, x: number, y: number) {
+	const describe = (p: { x: number; y: number }) => {
+		const el = document.elementFromPoint(p.x, p.y);
+		if (!el) return 'nothing';
+		const id = el.id ? `#${el.id}` : '';
+		const src = el instanceof HTMLIFrameElement ? ` src=${el.src.slice(0, 120)}` : '';
+		const text = (el.textContent ?? '').trim().slice(0, 40);
+		return `<${el.tagName.toLowerCase()}${id}>${src} "${text}"`;
+	};
+	const under = await page.evaluate(describe, { x, y }).catch(() => 'unreadable');
+	const host = (() => {
+		try {
+			return new URL(page.url()).hostname;
+		} catch {
+			return '';
+		}
+	})();
+	console.log(`[browser] tap ${Math.round(x)},${Math.round(y)} on ${host}: ${under}`);
+	await pause(3000);
+	const title = await page.title().catch(() => '');
+	console.log(`[browser] 3 s after tap on ${host}: title "${title}"`);
 }
 
 /** Closes the accounts tab (or one application's tab); the browser itself closes when idle. */

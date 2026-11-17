@@ -44,6 +44,63 @@ export function htmlToText(html: string) {
 		.trim();
 }
 
+// Applicant tracking systems companies host their own application forms on.
+const ATS_HOSTS = [
+	'greenhouse.io',
+	'lever.co',
+	'gupy.io',
+	'myworkdayjobs.com',
+	'myworkdaysite.com',
+	'ashbyhq.com',
+	'smartrecruiters.com',
+	'workable.com',
+	'bamboohr.com',
+	'recruitee.com',
+	'teamtailor.com',
+	'breezy.hr',
+	'jobvite.com',
+	'icims.com',
+	'successfactors.com',
+	'taleo.net',
+	'kenoby.com',
+	'solides.com.br',
+	'quickin.io',
+	'inhire.app',
+	'pandape.com.br'
+];
+const JOB_BOARDS = ['linkedin.com', 'glassdoor.com', 'glassdoor.com.br', 'lnkd.in'];
+
+const hostIs = (host: string, list: string[]) =>
+	list.some((h) => host === h || host.endsWith(`.${h}`));
+
+function httpUrl(value: string | null) {
+	if (!value) return null;
+	try {
+		const url = new URL(value);
+		return url.protocol === 'https:' || url.protocol === 'http:' ? url : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Where to apply outside the job board. Neither actor returns that link today
+ * (LinkedIn's `applyUrl` comes empty, Glassdoor has no such field), so besides
+ * the actor's own field this looks for a link to a known application system in
+ * the posting text. A link to anything else is not trusted to be the form.
+ */
+export function companyApplyUrl(fromActor: string | null, ...texts: (string | null)[]) {
+	const direct = httpUrl(fromActor);
+	if (direct && !hostIs(direct.hostname, JOB_BOARDS)) return direct.toString();
+	for (const text of texts) {
+		for (const match of (text ?? '').matchAll(/https?:\/\/[^\s"'<>)\]]+/g)) {
+			const url = httpUrl(match[0].replace(/&amp;/g, '&').replace(/[.,;:!?]+$/, ''));
+			if (url && hostIs(url.hostname, ATS_HOSTS)) return url.toString();
+		}
+	}
+	return null;
+}
+
 /** LinkedIn only filters by day, week or month: the smallest window that covers `days`. */
 function linkedInWindow(days: number) {
 	if (days <= 1) return 'r86400';
@@ -94,7 +151,7 @@ export async function searchLinkedIn(
 			companyLogo: str(it.companyLogo) ?? str(it.companyLogoUrl) ?? str(it.logoUrl),
 			location: str(it.location),
 			url,
-			applyUrl: str(it.applyUrl),
+			applyUrl: companyApplyUrl(str(it.applyUrl), str(it.descriptionHtml), str(it.description)),
 			salary: str(it.salary),
 			postedAt: str(it.postedDate),
 			description: str(it.description) ?? htmlToText(str(it.descriptionHtml) ?? '')
@@ -143,7 +200,7 @@ export async function searchGlassdoor(
 			companyLogo: str(employer?.logoUrl),
 			location: str(location?.name),
 			url,
-			applyUrl: null,
+			applyUrl: companyApplyUrl(str(it.applyUrl), str(it.description)),
 			salary: glassdoorSalary(it.pay),
 			postedAt: age == null ? null : new Date(Date.now() - age * 86_400_000).toISOString(),
 			description: htmlToText(str(it.description) ?? '')

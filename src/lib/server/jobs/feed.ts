@@ -9,11 +9,19 @@ export interface JobDto {
 	location: string | null;
 	source: 'linkedin' | 'glassdoor';
 	url: string;
+	/** Application form on the company's own site, when the posting has one. */
+	applyUrl: string | null;
+	/** Where the application goes through: the company's site, or the job board's own flow. */
+	applyVia: 'company' | 'linkedin' | 'glassdoor';
 	salary: string | null;
 	postedAt: string | null;
 	summary: string | null;
 	matchScore: number | null;
 	matchReasons: string[];
+}
+
+export function applyVia(row: { source: 'linkedin' | 'glassdoor'; applyUrl: string | null }) {
+	return row.applyUrl ? 'company' : row.source;
 }
 
 export function jobDto(row: typeof schema.job.$inferSelect): JobDto {
@@ -25,6 +33,8 @@ export function jobDto(row: typeof schema.job.$inferSelect): JobDto {
 		location: row.location,
 		source: row.source,
 		url: row.url,
+		applyUrl: row.applyUrl,
+		applyVia: applyVia(row),
 		salary: row.salary,
 		postedAt: row.postedAt,
 		summary: row.summary,
@@ -68,6 +78,8 @@ export function feed(userId: string, limit = 200): JobDto[] {
 		.orderBy(
 			sql`${schema.job.matchScore} is null`,
 			sql`${schema.job.matchScore} desc`,
+			// Same score: Glassdoor's own flow stops at a human check, so it goes after the rest.
+			sql`${schema.job.source} = 'glassdoor' and ${schema.job.applyUrl} is null`,
 			sql`${schema.job.createdAt} desc`
 		)
 		.limit(limit)

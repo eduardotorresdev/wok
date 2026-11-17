@@ -14,6 +14,8 @@ export interface Job {
 	summary: string | null;
 	matchScore: number | null;
 	matchReasons: string[];
+	/** Por onde a inscrição será feita. Ausente em servidores antigos. */
+	applyVia?: 'company' | 'linkedin' | 'glassdoor' | null;
 }
 
 export interface SearchRun {

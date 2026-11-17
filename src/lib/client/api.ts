@@ -135,7 +135,10 @@ export const api = {
 		answer: (id: string, answer: string) =>
 			call<Application>('POST', `/api/applications/${encodeURIComponent(id)}/answer`, { answer }),
 		resume: (id: string) =>
-			call<Application>('POST', `/api/applications/${encodeURIComponent(id)}/resume`, {})
+			call<Application>('POST', `/api/applications/${encodeURIComponent(id)}/resume`, {}),
+		/** A pessoa se inscreveu por conta própria no site. */
+		markSubmitted: (id: string) =>
+			call<Application>('POST', `/api/applications/${encodeURIComponent(id)}/mark-submitted`, {})
 	},
 	profile: {
 		get: () => call<Profile>('GET', '/api/profile'),

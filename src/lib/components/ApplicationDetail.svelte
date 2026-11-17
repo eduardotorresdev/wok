@@ -7,9 +7,10 @@
 	import { browser } from '$app/env';
 	import { resolve } from '$app/paths';
 	import { ApiError } from '#lib/client/api.ts';
-	import { clockTime, sourceLabel } from '#lib/client/format.ts';
+	import { applyViaLabel, clockTime, sourceLabel } from '#lib/client/format.ts';
 	import {
 		answerMutation,
+		markSubmittedMutation,
 		applicationQuery,
 		putApplication,
 		putStep,
@@ -43,6 +44,20 @@
 
 	const answer = createMutation(() => answerMutation(client));
 	const resume = createMutation(() => resumeApplicationMutation(client));
+	const markSubmitted = createMutation(() => markSubmittedMutation(client));
+	const via = $derived(app ? applyViaLabel(app.job) : null);
+
+	function markDone() {
+		if (!app) return;
+		markSubmitted.mutate(
+			{ id: app.id },
+			{
+				onSuccess: () => toast({ text: 'Marcada como enviada.' }),
+				onError: () =>
+					toast({ text: 'Não deu para marcar como enviada. Tente de novo.', tone: 'danger' })
+			}
+		);
+	}
 	let reply = $state('');
 
 	// Status e passos chegam por SSE enquanto a folha está aberta; sem SSE, o polling cobre.
@@ -78,7 +93,13 @@
 	let before: { id: string; waiting: boolean } | null = null;
 	$effect(() => {
 		const now = { id, waiting: needsBrowser };
-		if (before?.id === now.id && before.waiting && !now.waiting && !resume.isPending) {
+		if (
+			before?.id === now.id &&
+			before.waiting &&
+			!now.waiting &&
+			!resume.isPending &&
+			!markSubmitted.isPending
+		) {
 			resumedAlone = app?.status === 'applying' || app?.status === 'submitted';
 		} else if (before?.id !== now.id || now.waiting) {
 			resumedAlone = false;
@@ -147,6 +168,9 @@
 				<Icon name="external" size={14} />
 			</a>
 		</div>
+		{#if via}
+			<p class="t-caption mb-2 flex items-center gap-1.5"><Icon name="send" size={14} />{via}</p>
+		{/if}
 		{#if app.lastMessage && app.status !== 'needs_user'}
 			<p class="text-[0.9375rem] leading-snug" aria-live="polite">{app.lastMessage}</p>
 		{/if}
@@ -249,6 +273,44 @@
 						applicationId={app.id}
 						fallbackUrl={app.job.url}
 					/>
+				</div>
+				<!-- Saída sem o visor: a pessoa se inscreve no site e avisa aqui. -->
+				<div class="mt-5 border-t border-line pt-4">
+					<h3 class="t-title">Prefere fazer pelo site?</h3>
+					<p class="mt-1 text-sm leading-snug text-ink-soft">
+						Abra a vaga, envie o currículo adaptado e marque aqui quando terminar.
+					</p>
+					<div class="mt-3 flex flex-col gap-2">
+						<a
+							href={app.job.url}
+							target="_blank"
+							rel="noopener noreferrer external"
+							class="btn btn-quiet"
+						>
+							<Icon name="external" size={20} />
+							Abrir a vaga no site
+						</a>
+						{#if app.tailoredPdfUrl}
+							<a
+								href={app.tailoredPdfUrl}
+								download="curriculo.pdf"
+								rel="external"
+								class="btn btn-quiet"
+							>
+								<Icon name="doc" size={20} />
+								Baixar currículo adaptado
+							</a>
+						{/if}
+						<button
+							type="button"
+							class="btn btn-quiet"
+							disabled={markSubmitted.isPending}
+							onclick={markDone}
+						>
+							<Icon name="check" size={20} />
+							Já me inscrevi por lá
+						</button>
+					</div>
 				</div>
 			</section>
 		{:else if app.status === 'applying'}

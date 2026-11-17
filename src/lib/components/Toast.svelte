@@ -24,7 +24,7 @@
 </script>
 
 <div
-	class="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+8px)] z-40 flex justify-center px-4"
+	class="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+8px)] z-[60] flex justify-center px-4"
 	aria-live="polite"
 >
 	{#if current}

@@ -40,3 +40,11 @@ export function clockTime(iso: string) {
 		? ''
 		: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
+
+/** "Inscrição pelo site da empresa", quando o servidor informa o caminho. */
+export function applyViaLabel(job: Pick<Job, 'applyVia'>) {
+	if (job.applyVia === 'company') return 'Inscrição pelo site da empresa';
+	if (job.applyVia === 'linkedin') return 'Inscrição pelo LinkedIn';
+	if (job.applyVia === 'glassdoor') return 'Inscrição pelo Glassdoor';
+	return null;
+}

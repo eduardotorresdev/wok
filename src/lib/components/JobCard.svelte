@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
 	import type { Job } from '#lib/client/types.ts';
-	import { relativeTime, scorePercent, sourceLabel } from '#lib/client/format.ts';
+	import { applyViaLabel, relativeTime, scorePercent, sourceLabel } from '#lib/client/format.ts';
 	import CompanyAvatar from './CompanyAvatar.svelte';
 	import Icon from './Icon.svelte';
 	import ScoreMark from './ScoreMark.svelte';
@@ -26,6 +26,7 @@
 	} = $props();
 
 	const posted = $derived(relativeTime(job.postedAt));
+	const via = $derived(applyViaLabel(job));
 	const hasScore = $derived(scorePercent(job.matchScore) !== null);
 </script>
 
@@ -85,6 +86,10 @@
 					>{/if}
 			</p>
 
+			{#if via}
+				<p class="t-caption mt-1 flex items-center gap-1.5"><Icon name="send" size={14} />{via}</p>
+			{/if}
+
 			{#if job.summary}
 				<p class="summary mt-3 text-[0.9375rem] leading-normal">{job.summary}</p>
 			{/if}
@@ -136,6 +141,11 @@
 						>{/if}
 				</p>
 				<div class="mt-2">{@render source()}</div>
+				{#if via}
+					<p class="t-caption mt-1 flex items-center gap-1.5">
+						<Icon name="send" size={14} />{via}
+					</p>
+				{/if}
 
 				{#if hasScore}
 					<section class="mt-5 flex items-center gap-3.5 rounded-sm bg-band p-3.5">

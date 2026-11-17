@@ -24,6 +24,7 @@ export const JOBS: Job[] = [
 		location: 'São Paulo, SP · Híbrido',
 		source: 'linkedin',
 		url: 'https://www.linkedin.com/jobs/view/1',
+		applyVia: 'company',
 		salary: 'R$ 18–24 mil',
 		postedAt: ago(0.4),
 		summary:
@@ -42,6 +43,7 @@ export const JOBS: Job[] = [
 		location: 'Remoto · Brasil',
 		source: 'glassdoor',
 		url: 'https://www.glassdoor.com.br/job/2',
+		applyVia: 'glassdoor',
 		salary: 'R$ 20–26 mil',
 		postedAt: ago(1),
 		summary:
@@ -295,12 +297,12 @@ export async function mock(method: string, path: string, body: unknown): Promise
 		if (!found) throw new ApiError(404, 'not_found', 'Candidatura não encontrada.');
 		return found;
 	}
-	const resume = route.match(/^POST \/api\/applications\/([^/]+)\/(answer|resume)$/);
+	const resume = route.match(/^POST \/api\/applications\/([^/]+)\/(answer|resume|mark-submitted)$/);
 	if (resume) {
 		const entry = s.apps.find((a) => a.id === decodeURIComponent(resume[1]));
 		if (!entry) throw new ApiError(404, 'application_not_found', 'Inscrição não encontrada.');
 		// Volta para o trecho "inscrevendo" e termina como enviada.
-		entry.createdAt = Date.now() - 12_000;
+		entry.createdAt = Date.now() - (resume[2] === 'mark-submitted' ? 60_000 : 12_000);
 		s.apps = s.apps.map((a) => (a === entry ? { ...a, forceSubmit: true } : a));
 		save();
 		return applications().find((a) => a.id === entry.id);

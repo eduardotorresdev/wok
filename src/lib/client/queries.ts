@@ -136,7 +136,8 @@ export function putApplication(client: QueryClient, app: Application) {
 const requeue = (
 	client: QueryClient,
 	key: string,
-	run: (id: string, answer: string) => Promise<Application>
+	run: (id: string, answer: string) => Promise<Application>,
+	optimistic: Partial<Application> = { status: 'queued', lastMessage: 'Retomando a inscrição.' }
 ) =>
 	mutationOptions({
 		mutationKey: ['applications', key],
@@ -149,11 +150,10 @@ const requeue = (
 			if (previous) {
 				putApplication(client, {
 					...previous,
-					status: 'queued',
 					needsKind: null,
 					pendingQuestion: null,
-					lastMessage: 'Retomando a inscrição.',
-					updatedAt: new Date().toISOString()
+					updatedAt: new Date().toISOString(),
+					...optimistic
 				});
 			}
 			return { previous };
@@ -172,6 +172,12 @@ export const answerMutation = (client: QueryClient) =>
 
 export const resumeApplicationMutation = (client: QueryClient) =>
 	requeue(client, 'resume', (id) => api.applications.resume(id));
+
+export const markSubmittedMutation = (client: QueryClient) =>
+	requeue(client, 'mark-submitted', (id) => api.applications.markSubmitted(id), {
+		status: 'submitted',
+		lastMessage: 'Você se inscreveu pelo site.'
+	});
 
 export const preferencesQuery = () =>
 	queryOptions({

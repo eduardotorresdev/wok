@@ -20,8 +20,13 @@ function createAuth() {
 		plugins: [
 			magicLink({
 				expiresIn: 60 * 15,
-				sendMagicLink: async ({ email, url }) => {
-					await sendMagicLinkEmail(email, url);
+				sendMagicLink: async ({ email, url, token }) => {
+					// Email the confirmation page, not the verify endpoint: see /api/login-link.
+					const callback = new URL(url).searchParams.get('callbackURL') ?? '/';
+					const link = new URL('/api/login-link', config.baseUrl);
+					link.searchParams.set('token', token);
+					link.searchParams.set('callbackURL', callback);
+					await sendMagicLinkEmail(email, link.toString());
 				}
 			}),
 			sveltekitCookies(getRequestEvent)

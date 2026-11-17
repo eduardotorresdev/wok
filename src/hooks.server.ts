@@ -24,7 +24,7 @@ export const init: ServerInit = async () => {
 	process.on('sveltekit:shutdown', () => void closeAll());
 };
 
-const PUBLIC_PREFIXES = ['/login', '/api/auth', '/api/health'];
+const PUBLIC_PREFIXES = ['/login', '/api/auth', '/api/health', '/api/login-link'];
 
 function isPublic(pathname: string) {
 	return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'));

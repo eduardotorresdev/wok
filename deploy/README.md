@@ -13,7 +13,8 @@ deploy/smoke.sh           # só o smoke test (domínio público); deploy/smoke.s
 
 Só entra o que está **commitado** no ref (`git archive`), nunca o working tree.
 Se o ref ainda não usa `@sveltejs/adapter-node`, o script troca o adapter apenas dentro da release.
-Se a release nova não responder em 90s, o symlink volta para a anterior.
+Se a release nova não responder em 6 min (`WOK_HEALTH_TRIES`), o symlink volta para a anterior.
+Install e build rodam com `nice`/`ionice` e teto de memória (`WOK_BUILD_HEAP_MB`, padrão 1536).
 
 Antes de ativar, o deploy espera (até 15 min, `WOK_WAIT_INFLIGHT`) não haver inscrição em
 `tailoring`/`applying` nem busca `running`, porque o restart as interrompe; se não esvaziar,

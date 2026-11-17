@@ -26,25 +26,31 @@ mkdir -p "$REL" "$APP_ROOT/bin" "$DATA_DIR"
 git -C "$REPO" archive "$REF" | tar -x -C "$REL"
 cd "$REL"
 
+# Install e build rodam com prioridade baixa de CPU/disco e teto de memória, para não
+# disputar com o processo de produção na mesma máquina.
+LOW=(nice -n 15)
+command -v ionice >/dev/null && LOW+=(ionice -c 3)
+BUILD_HEAP_MB="${WOK_BUILD_HEAP_MB:-1536}"
+
 echo "==> install"
-pnpm install --frozen-lockfile
+"${LOW[@]}" pnpm install --frozen-lockfile
 
 # Enquanto o repo não usar adapter-node, aplica só na release (nunca no repo).
 CFGS=()
 for f in vite.config.ts svelte.config.js; do [ -f "$f" ] && CFGS+=("$f"); done
 if ! grep -qs "adapter-node" "${CFGS[@]}"; then
 	echo "==> adapter-node ausente no ref; aplicando shim na release"
-	pnpm add -D @sveltejs/adapter-node
+	"${LOW[@]}" pnpm add -D @sveltejs/adapter-node
 	sed -i 's#@sveltejs/adapter-auto#@sveltejs/adapter-node#' "${CFGS[@]}"
 fi
 
 echo "==> chromium do playwright"
-pnpm exec playwright install chromium
+"${LOW[@]}" pnpm exec playwright install chromium
 
 echo "==> build"
 # Variáveis do servidor disponíveis no build ($env/static/*), sem vazar para o log.
 set -a; . "$ENV_FILE"; set +a
-pnpm build
+NODE_OPTIONS="--max-old-space-size=$BUILD_HEAP_MB" "${LOW[@]}" pnpm build
 [ -f build/index.js ] || { echo "build/index.js não gerado (adapter-node?)"; exit 1; }
 echo "$SHA" > build/REVISION
 
@@ -68,8 +74,10 @@ echo "==> ativando"
 install -m 755 "$HERE/supervise.sh" "$HERE/backup.sh" "$APP_ROOT/bin/"
 ln -sfn "$REL" "$APP_ROOT/current.tmp" && mv -T "$APP_ROOT/current.tmp" "$APP_ROOT/current"
 
+# Com a máquina carregada o Node já levou minutos para abrir a porta.
+HEALTH_TRIES="${WOK_HEALTH_TRIES:-180}" # x2s
 healthy() {
-	for _ in $(seq 1 45); do
+	for _ in $(seq 1 "$HEALTH_TRIES"); do
 		if [ "$(cat "$APP_ROOT/running-release" 2>/dev/null)" = "$1" ] &&
 			curl -fs -o /dev/null -m 5 "http://127.0.0.1:$PORT/api/health"; then return 0; fi
 		sleep 2
@@ -78,7 +86,7 @@ healthy() {
 }
 
 if ! healthy "$REL"; then
-	echo "!! release não ficou saudável em 90s"
+	echo "!! release não ficou saudável em $((HEALTH_TRIES * 2))s"
 	if [ -n "$PREV" ] && [ -d "$PREV" ]; then
 		echo "!! rollback para $PREV"
 		ln -sfn "$PREV" "$APP_ROOT/current.tmp" && mv -T "$APP_ROOT/current.tmp" "$APP_ROOT/current"

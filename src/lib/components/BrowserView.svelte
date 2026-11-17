@@ -62,10 +62,20 @@
 
 	// O servidor responde na hora e a página abre em segundo plano: até `loading` cair,
 	// a tela mostra o aviso de abertura e não aceita toque nem teclado.
-	const loading = $derived(opening || !!remote?.loading);
-	const loadError = $derived(loading ? null : (remote?.loadError ?? null));
+	// `stale`: a imagem na tela ainda é da página anterior. Vira falso no primeiro frame
+	// depois de a página nova responder; a partir daí a tela já pode ser usada, mesmo que
+	// o servidor ainda diga `loading` ou termine em `loadError`.
+	let stale = $state(false);
+	let answered = false;
+	let titleBefore: string | null = null;
+	let errorDismissed = $state(false);
+	const loading = $derived(opening || (!!remote?.loading && (stale || !frame)));
+	const loadError = $derived(opening || remote?.loading ? null : (remote?.loadError ?? null));
+	// Com a página na tela o erro é só um aviso; a tela cheia fica para quando não há imagem.
+	const errorFull = $derived(!!loadError && (!frame || stale));
+	const errorNote = $derived(!!loadError && !errorFull && !errorDismissed);
 	const canControl = $derived(
-		mode === 'control' && remote?.controller === 'user' && !loading && !loadError
+		mode === 'control' && remote?.controller === 'user' && !loading && !errorFull
 	);
 	const ratio = $derived.by(() => {
 		const size = remote?.viewport ?? frame;
@@ -91,7 +101,7 @@
 		available = Math.floor(limit - top - 12);
 	}
 	$effect(() => {
-		void [boxWidth, canControl, notice, trouble, urlOpen];
+		void [boxWidth, canControl, notice, trouble, urlOpen, errorNote];
 		if (!fit || !browser) return;
 		const raf = requestAnimationFrame(measure);
 		window.addEventListener('resize', measure);
@@ -107,6 +117,17 @@
 	});
 
 	function setState(state: BrowserState) {
+		if (state.loading && !remote?.loading) {
+			// Começou a abrir outra página: o que está na tela é da anterior.
+			stale = true;
+			answered = false;
+			errorDismissed = false;
+			titleBefore = remote?.title ?? null;
+		} else if (state.loading && state.title && state.title !== titleBefore) {
+			// Título novo e real: a página respondeu. O próximo frame já é dela.
+			if (!/^(loading |about:)/i.test(state.title)) answered = true;
+		}
+		if (!state.loading && !state.loadError) stale = false;
 		remote = state;
 		onstate?.(state);
 	}
@@ -137,6 +158,7 @@
 		source.addEventListener('frame', (event) => {
 			const data = JSON.parse((event as MessageEvent).data) as BrowserFrame;
 			trouble = null;
+			if (answered) stale = false;
 			frame = {
 				src: `data:image/jpeg;base64,${data.jpeg}`,
 				width: data.width,
@@ -195,7 +217,7 @@
 	// estar partindo a frio, então a espera é de 20 s.
 	$effect(() => {
 		void attempt;
-		if (frame || opening || loadError || trouble === 'failed' || !(takeover || remote?.open))
+		if (frame || opening || errorFull || trouble === 'failed' || !(takeover || remote?.open))
 			return;
 		const timer = setTimeout(
 			() => {
@@ -506,6 +528,27 @@
 		{/if}
 	</div>
 
+	{#if errorNote}
+		<!-- A página está na tela e dá para usar: o erro é um aviso que se pode fechar. -->
+		<div
+			class="flex items-center gap-1 border-x border-line bg-danger-tint py-1 pr-1 pl-3 text-sm leading-snug text-danger"
+			role="alert"
+		>
+			<p class="min-w-0 flex-1">A página pode não ter carregado inteira.</p>
+			<button type="button" class="min-h-11 shrink-0 px-2 font-medium underline" onclick={retry}>
+				Tentar de novo
+			</button>
+			<button
+				type="button"
+				class="grid size-11 shrink-0 place-items-center"
+				aria-label="Fechar aviso"
+				onclick={() => (errorDismissed = true)}
+			>
+				<Icon name="x" size={18} />
+			</button>
+		</div>
+	{/if}
+
 	<!-- Tela remota -->
 	<div class="rounded-b-md border border-t-0 border-line">
 		<div
@@ -523,7 +566,7 @@
 			onpointerup={up}
 			onpointercancel={() => (pointer = null)}
 		>
-			{#if loadError}
+			{#if errorFull}
 				<div
 					class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
 					role="alert"
@@ -600,7 +643,7 @@
 			{#each marks as mark (mark.id)}
 				<span class="mark" style="left: {mark.x}px; top: {mark.y}px" aria-hidden="true"></span>
 			{/each}
-			{#if frame && maxPan > 0 && !loadError}
+			{#if frame && maxPan > 0 && !errorFull}
 				<!-- Há mais página do que cabe na janela: trilho à direita e aviso embaixo. -->
 				<span
 					class="thumb"
@@ -614,7 +657,7 @@
 					</span>
 				{/if}
 			{/if}
-			{#if loading && !loadError}
+			{#if loading}
 				<div
 					class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-paper/80 text-sm font-medium"
 					role="status"

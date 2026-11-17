@@ -1,6 +1,6 @@
 ---
 name: wok
-description: Landing editorial em papel branco, serifa moderna e pinceladas roxas feitas à mão.
+description: Papel branco, serifa moderna e pinceladas roxas feitas à mão; landing editorial e produto mobile.
 colors:
   primary: '#7446c4'
   primary-deep: '#56309a'
@@ -185,6 +185,59 @@ Cantos quase retos, como papel cortado: 4px em folhas e cartões, 8px em botões
 
 - Pequeno ícone ilustrado em Roxo Tinta no lugar de bullets, seguido de uma frase em body.
 
+## Produto mobile
+
+A landing define a linguagem; o app a usa num celular, com uma mão. Tudo abaixo vale para as telas logadas (`src/routes/(app)`, onboarding e login) e está implementado em `src/routes/layout.css` e `src/lib/components`.
+
+### Tokens acrescentados
+
+- **Perigo** `#a3293d` e **Perigo claro** `#f8ecee`: erro, falha e currículo com mais de uma página. Nunca como decoração.
+- **Sombra "Papel erguido":** a do card arrastado e do currículo do login; mais longa que "Papel pousado".
+- **Escala de texto do app:** display 2.5rem e headline 1.75rem fixos (sem clamp), title 1.375rem, body 1rem / 0.9375rem em listas densas, caption 0.8125rem em Tinta Suave.
+
+### Estrutura
+
+- **Casca:** altura `100dvh`, conteúdo rolando no meio, navegação fixa embaixo. Respeita `safe-area-inset` em cima e embaixo.
+- **Navegação inferior:** três itens (Vagas, Inscrições, Perfil), ícone de traço + label. O ativo fica em Tinta Ameixa com um traço de pincel roxo embaixo; os outros em Tinta Suave. Sem fundo colorido, só uma linha em cima.
+- **Cabeçalho de tela:** título em headline serifado à esquerda e, ao lado, uma contagem em caption ("5 para ver", "2 precisam de você"). Sem barra, sem sombra.
+- **Abas de texto:** dentro do Perfil (Currículo | Busca e dados), label com sublinhado roxo de 2px na ativa.
+- **Alvos de toque:** 44px no mínimo; botões e campos 48px. Margem lateral de 16 a 20px.
+
+### Card de vaga (frente e verso)
+
+- Folha de papel pousada sobre a pincelada, com mais duas folhas aparecendo por baixo.
+- **Frente:** avatar da empresa, marca da origem, nota de match num anel roxo, título serifado, local e salário, resumo e até três motivos com o marcador de pincel. Tocar vira a folha.
+- **Verso:** os detalhes completos, com rolagem; arrastar para os lados continua valendo.
+- **Gesto:** direita inscreve, esquerda descarta. O card gira pelo ponto em que foi pego e revela um carimbo ("Inscrever" em roxo, "Deixar pra lá" em Tinta Suave). Os dois botões embaixo fazem o mesmo para quem não arrasta.
+- A pincelada grande da tela é a que passa atrás do baralho.
+
+### Folha inferior (sheet)
+
+- Sobe de baixo com cantos de 8px só em cima, título serifado, botão de fechar e rodapé fixo com a ação principal. Usada para o aviso da primeira inscrição, o detalhe da inscrição, "Conectar contas" e o log do LaTeX.
+
+### Formulários
+
+- **Campo:** papel, contorno de 1px em Linha, 8px de raio, 48px de altura, texto de 16px (evita o zoom do iOS). Foco com contorno de 2px em Tinta Ameixa.
+- **Chip:** etiqueta de papel de 44px, mesmo contorno e raio, nunca pílula; selecionado em Roxo Claro com borda e texto em Roxo Tinta Escuro. Serve para escolha única, sugestões ("+ São Paulo") e listas editáveis (termo com "x").
+- **Caixa de seleção:** quadrado de 24px; marcada em Tinta Ameixa com o tique branco.
+- **Seções opcionais** ficam recolhidas (`details`) e o onboarding sempre oferece "Pular".
+
+### Estados e avisos
+
+- **Status de inscrição:** ícone + label. Em andamento, um ponto roxo pulsando; "Precisa de você" sobre Roxo Claro; enviada com tique roxo; falha em Perigo.
+- **Bloco de atenção:** fundo Roxo Claro, 4px de raio, para o que depende da pessoa (pergunta do formulário, login pedido pelo site). Erros usam Perigo claro.
+- **Nota do agente:** texto corrido com um fio roxo de 2px à esquerda.
+- **Toast:** em cima, Tinta Ameixa com texto Papel, uma linha e no máximo uma ação.
+- **Carregando:** blocos em Cinza de faixa pulsando, no formato do que vai chegar.
+
+### Visor do browser
+
+- Barra em Tinta Ameixa com o endereço e quem está no controle; embaixo, a página remota em largura total numa janela que se arrasta. Em modo controle, campo de digitação e teclas (Enter, Tab, Apagar) logo abaixo.
+
+### Marcas de terceiros
+
+- LinkedIn e Glassdoor aparecem com a própria cor, pequenos, só para dizer de onde vem a vaga ou qual conta conectar. É a única cor fora da paleta.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -193,6 +246,7 @@ Cantos quase retos, como papel cortado: 4px em folhas e cartões, 8px em botões
 - **Do** dar ao hero um título, uma frase, um botão e uma linha de microcopy, nada mais.
 - **Do** deixar o objeto principal cruzar a fronteira entre o papel branco e a faixa cinza.
 - **Do** usar sombra só em objetos de papel.
+- **Do** no app, manter uma ação principal por tela, no rodapé e ao alcance do polegar.
 
 ### Don't:
 
@@ -200,3 +254,5 @@ Cantos quase retos, como papel cortado: 4px em folhas e cartões, 8px em botões
 - **Don't** reutilizar nome, logo do pássaro ou ilustrações da referência; ela define o estilo, não os ativos.
 - **Don't** pôr mais de uma pincelada grande por página.
 - **Don't** usar títulos em negrito ou em caixa alta.
+- **Don't** usar o vermelho de perigo fora de erro, nem as cores de LinkedIn e Glassdoor fora das marcas deles.
+- **Don't** criar tela ou aba de browser: o visor vive dentro da inscrição e de "Conectar contas".

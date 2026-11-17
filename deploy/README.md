@@ -59,7 +59,7 @@ heartbeat (comentário `: ping`) a cada ~15-30s e não comprimir essas respostas
 
 ## Dependências da máquina
 
-- Node 22 e pnpm em `~/.local/bin`.
+- Node 22 e pnpm 10 (a mesma major do projeto) em `~/.local/bin`.
 - Chromium do Playwright em `~/.cache/ms-playwright` (instalado a cada deploy na versão do
   lockfile; libs de sistema já presentes, sem `--with-deps` porque não há sudo).
 - `tectonic` 0.15 em `~/.local/bin` (baixa pacotes TeX sob demanda para `~/.cache/Tectonic`).

@@ -9,6 +9,7 @@ ENV_FILE="$APP_ROOT/shared/.env"
 ORIGIN="$(grep -E '^ORIGIN=' "$ENV_FILE" | cut -d= -f2)"
 PORT="$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2)"
 BASE="${1:-$ORIGIN}"
+LOCAL="http://127.0.0.1:$PORT"
 EMAIL="${SMOKE_EMAIL:-delivered@resend.dev}"
 fail=0
 
@@ -29,7 +30,7 @@ http_is() { # url, código esperado, [args curl...]
 magic_link() {
 	local body code
 	body="$(mktemp)"
-	code="$(curl -s -o "$body" -m 30 -w '%{http_code}' -X POST "$BASE/api/auth/sign-in/magic-link" \
+	code="$(curl -s -o "$body" -m 30 -w '%{http_code}' -X POST "$LOCAL/api/auth/sign-in/magic-link" \
 		-H 'Content-Type: application/json' -H "Origin: $ORIGIN" \
 		-d "{\"email\":\"$EMAIL\",\"callbackURL\":\"/\"}")"
 	[ "$code" = "200" ] || { echo "HTTP $code: $(head -c 300 "$body")"; rm -f "$body"; return 1; }
@@ -55,10 +56,15 @@ tectonic_compiles() {
 }
 
 echo "smoke em $BASE (release $(cat "$APP_ROOT/current/build/REVISION" 2>/dev/null || echo '?'))"
-check "app local responde 200 (127.0.0.1:$PORT)" http_is "http://127.0.0.1:$PORT/" 200
-check "HTTPS 200 em $BASE/"                      http_is "$BASE/" 200
-check "/api/auth respondendo (/api/auth/ok)"     http_is "$BASE/api/auth/ok" 200
-check "magic link real via Resend -> $EMAIL"     magic_link
+# Local: prova o app em si, independente de DNS/túnel.
+check "local /api/health 200 ($LOCAL)"            http_is "$LOCAL/api/health" 200
+check "local / 200"                               http_is "$LOCAL/" 200 -L
+check "local /api/auth respondendo (/api/auth/ok)" http_is "$LOCAL/api/auth/ok" 200
+check "magic link real via Resend -> $EMAIL"      magic_link
+# Público: DNS + túnel + TLS.
+check "HTTPS 200 em $BASE/"                       http_is "$BASE/" 200 -L
+check "HTTPS $BASE/api/health 200"                http_is "$BASE/api/health" 200
+check "HTTPS $BASE/api/auth/ok 200"               http_is "$BASE/api/auth/ok" 200
 check "Chromium headless abre no servidor"       chromium_opens
 check "tectonic compila um .tex"                 tectonic_compiles
 exit $fail

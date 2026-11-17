@@ -16,6 +16,13 @@ Se o ref ainda não usa `@sveltejs/adapter-node`, o script troca o adapter apena
 Se a release nova não responder em 6 min (`WOK_HEALTH_TRIES`), o symlink volta para a anterior.
 Install e build rodam com `nice`/`ionice` e teto de memória (`WOK_BUILD_HEAP_MB`, padrão 1536).
 
+O build acontece inteiro antes de qualquer restart. Para separar as fases:
+`WOK_BUILD_ONLY=1 deploy/deploy.sh` constrói e para; `WOK_RELEASE=<dir> deploy/deploy.sh` ativa.
+
+Não reinicia com a máquina sobrecarregada (load de 1 min >= 8 ou menos de 2 GB disponíveis:
+`WOK_MAX_LOAD`, `WOK_MIN_AVAIL_MB`); espera 10 min (`WOK_WAIT_HOST`) e sai com código 4,
+deixando a release pronta.
+
 Antes de ativar, o deploy espera (até 15 min, `WOK_WAIT_INFLIGHT`) não haver inscrição em
 `tailoring`/`applying` nem busca `running`, porque o restart as interrompe; se não esvaziar,
 sai com código 3 sem trocar a release. `deploy/inflight.sh` mostra a contagem; `WOK_FORCE=1` ignora.

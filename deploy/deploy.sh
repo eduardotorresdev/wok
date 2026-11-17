@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Deploy de um comando: deploy/deploy.sh [ref]   (ref padrão: pilot)
 # Roda NA própria máquina de produção (o repo vive aqui). Passos:
-#   git archive do ref -> install -> build (adapter-node) -> backup -> troca do symlink
-#   -> o supervisor reinicia o processo -> health check (rollback se falhar) -> smoke test.
+#   git archive do ref -> install -> build (adapter-node), tudo sem tocar na produção
+#   -> espera não haver trabalho em andamento e a máquina estar folgada -> backup
+#   -> troca do symlink -> o supervisor reinicia o processo -> health check (rollback se
+#   falhar) -> smoke test.
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -17,42 +19,82 @@ ENV_FILE="$APP_ROOT/shared/.env"
 PORT="$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2)"
 DATA_DIR="$(grep -E '^DATA_DIR=' "$ENV_FILE" | cut -d= -f2)"
 
-SHA="$(git -C "$REPO" rev-parse --short "$REF")"
-REL="$APP_ROOT/releases/$(date +%Y%m%d-%H%M%S)-$SHA"
 PREV="$(readlink -f "$APP_ROOT/current" 2>/dev/null || true)"
-echo "==> release $REL (ref $REF @ $SHA)"
 
-mkdir -p "$REL" "$APP_ROOT/bin" "$DATA_DIR"
-git -C "$REPO" archive "$REF" | tar -x -C "$REL"
-cd "$REL"
+# Duas fases. O build nunca toca na versão em produção; só a ativação reinicia.
+#   WOK_BUILD_ONLY=1         constrói e para (imprime o caminho da release)
+#   WOK_RELEASE=<diretório>  ativa uma release já construída, sem rebuild
+if [ -n "${WOK_RELEASE:-}" ]; then
+	REL="$(readlink -f "$WOK_RELEASE")"
+	[ -f "$REL/build/index.js" ] || { echo "release sem build: $REL"; exit 1; }
+	SHA="$(cat "$REL/build/REVISION")"
+	echo "==> ativando release já construída $REL ($SHA)"
+else
+	SHA="$(git -C "$REPO" rev-parse --short "$REF")"
+	REL="$APP_ROOT/releases/$(date +%Y%m%d-%H%M%S)-$SHA"
+	echo "==> release $REL (ref $REF @ $SHA)"
 
-# Install e build rodam com prioridade baixa de CPU/disco e teto de memória, para não
-# disputar com o processo de produção na mesma máquina.
-LOW=(nice -n 15)
-command -v ionice >/dev/null && LOW+=(ionice -c 3)
-BUILD_HEAP_MB="${WOK_BUILD_HEAP_MB:-1536}"
+	mkdir -p "$REL" "$APP_ROOT/bin" "$DATA_DIR"
+	git -C "$REPO" archive "$REF" | tar -x -C "$REL"
+	cd "$REL"
 
-echo "==> install"
-"${LOW[@]}" pnpm install --frozen-lockfile
+	# Install e build rodam com prioridade baixa de CPU/disco e teto de memória, para não
+	# disputar com o processo de produção na mesma máquina.
+	LOW=(nice -n 15)
+	command -v ionice >/dev/null && LOW+=(ionice -c 3)
+	BUILD_HEAP_MB="${WOK_BUILD_HEAP_MB:-1536}"
 
-# Enquanto o repo não usar adapter-node, aplica só na release (nunca no repo).
-CFGS=()
-for f in vite.config.ts svelte.config.js; do [ -f "$f" ] && CFGS+=("$f"); done
-if ! grep -qs "adapter-node" "${CFGS[@]}"; then
-	echo "==> adapter-node ausente no ref; aplicando shim na release"
-	"${LOW[@]}" pnpm add -D @sveltejs/adapter-node
-	sed -i 's#@sveltejs/adapter-auto#@sveltejs/adapter-node#' "${CFGS[@]}"
+	echo "==> install"
+	"${LOW[@]}" pnpm install --frozen-lockfile
+
+	# Enquanto o repo não usar adapter-node, aplica só na release (nunca no repo).
+	CFGS=()
+	for f in vite.config.ts svelte.config.js; do [ -f "$f" ] && CFGS+=("$f"); done
+	if ! grep -qs "adapter-node" "${CFGS[@]}"; then
+		echo "==> adapter-node ausente no ref; aplicando shim na release"
+		"${LOW[@]}" pnpm add -D @sveltejs/adapter-node
+		sed -i 's#@sveltejs/adapter-auto#@sveltejs/adapter-node#' "${CFGS[@]}"
+	fi
+
+	echo "==> chromium do playwright"
+	"${LOW[@]}" pnpm exec playwright install chromium
+
+	echo "==> build"
+	# Variáveis do servidor disponíveis no build ($env/static/*), sem vazar para o log.
+	set -a; . "$ENV_FILE"; set +a
+	NODE_OPTIONS="--max-old-space-size=$BUILD_HEAP_MB" "${LOW[@]}" pnpm build
+	[ -f build/index.js ] || { echo "build/index.js não gerado (adapter-node?)"; exit 1; }
+	echo "$SHA" > build/REVISION
+
 fi
 
-echo "==> chromium do playwright"
-"${LOW[@]}" pnpm exec playwright install chromium
+if [ "${WOK_BUILD_ONLY:-0}" = "1" ]; then
+	echo "==> build pronto, NÃO ativado: $REL"
+	echo "    ativar: WOK_RELEASE=$REL deploy/deploy.sh"
+	exit 0
+fi
 
-echo "==> build"
-# Variáveis do servidor disponíveis no build ($env/static/*), sem vazar para o log.
-set -a; . "$ENV_FILE"; set +a
-NODE_OPTIONS="--max-old-space-size=$BUILD_HEAP_MB" "${LOW[@]}" pnpm build
-[ -f build/index.js ] || { echo "build/index.js não gerado (adapter-node?)"; exit 1; }
-echo "$SHA" > build/REVISION
+# Restart com a máquina sobrecarregada já deixou o site minutos fora (Node sem conseguir
+# abrir a porta). Só reinicia com load de 1 min < WOK_MAX_LOAD e memória disponível
+# > WOK_MIN_AVAIL_MB; espera até WOK_WAIT_HOST s e desiste (código 4). WOK_FORCE=1 ignora.
+host_ok() {
+	local load avail
+	load="$(cut -d' ' -f1 /proc/loadavg)"
+	avail="$(awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo)"
+	echo "   load 1min $load (máx ${WOK_MAX_LOAD:-8}), memória disponível ${avail} MB (mín ${WOK_MIN_AVAIL_MB:-2000})"
+	awk -v l="$load" -v m="${WOK_MAX_LOAD:-8}" 'BEGIN { exit !(l < m) }' && [ "$avail" -ge "${WOK_MIN_AVAIL_MB:-2000}" ]
+}
+echo "==> carga da máquina"
+waited=0
+until host_ok; do
+	if [ "${WOK_FORCE:-0}" = "1" ]; then echo "   WOK_FORCE=1: seguindo mesmo assim"; break; fi
+	if [ "$waited" -ge "${WOK_WAIT_HOST:-600}" ]; then
+		echo "!! máquina sobrecarregada após ${waited}s; deploy NÃO ativado (release pronta em $REL)"
+		echo "    ativar depois: WOK_RELEASE=$REL deploy/deploy.sh"
+		exit 4
+	fi
+	sleep 30; waited=$((waited + 30))
+done
 
 # Restart interrompe busca (vira failed) e inscrição em andamento (volta para a fila).
 # Espera terminar; WOK_WAIT_INFLIGHT=segundos (padrão 900), WOK_FORCE=1 ignora.
@@ -97,7 +139,7 @@ fi
 echo "==> no ar: $SHA em 127.0.0.1:$PORT"
 
 # Mantém as $KEEP releases mais recentes.
-ls -1dt "$APP_ROOT"/releases/*/ | tail -n +$((KEEP + 1)) | xargs -r rm -rf
+ls -1dt "$APP_ROOT"/releases/*/ | tail -n +$((KEEP + 1)) | grep -vF "$REL/" | xargs -r rm -rf
 
 echo "==> smoke"
 "$HERE/smoke.sh" || { echo "!! smoke test com falhas (deploy mantido)"; exit 2; }

@@ -184,13 +184,18 @@
 		void take();
 	});
 
-	// Página esperada e nenhum frame em 8 s: mostra a falha em vez de uma área em branco.
+	// Página esperada e nenhum frame: mostra a falha em vez de uma área em branco. Numa
+	// inscrição a página já existia (8 s bastam); em "Conectar contas" o navegador pode
+	// estar partindo a frio, então a espera é de 20 s.
 	$effect(() => {
 		void attempt;
-		if (frame || trouble === 'failed' || !(takeover || remote?.open)) return;
-		const timer = setTimeout(() => {
-			if (!frame && !taking) trouble = 'failed';
-		}, 8000);
+		if (frame || opening || trouble === 'failed' || !(takeover || remote?.open)) return;
+		const timer = setTimeout(
+			() => {
+				if (!frame && !taking && !opening) trouble = 'failed';
+			},
+			applicationId ? 8000 : 20000
+		);
 		return () => clearTimeout(timer);
 	});
 
@@ -231,17 +236,25 @@
 		if (!clean) return;
 		opening = true;
 		notice = null;
-		try {
-			lastUrl = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
-			trouble = null;
-			setState(await api.browser.open(lastUrl, applicationId));
+		lastUrl = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+		trouble = null;
+		// O navegador remoto pode estar partindo a frio: uma falha do servidor é repetida
+		// antes de virar mensagem. Recusas (4xx) não melhoram com outra tentativa.
+		let opened = false;
+		for (let round = 0; round < 3 && alive && !opened; round += 1) {
+			try {
+				setState(await api.browser.open(lastUrl, applicationId));
+				opened = true;
+			} catch (error) {
+				if (error instanceof ApiError && error.status < 500) break;
+				if (round < 2) await new Promise((resolve) => setTimeout(resolve, 2500));
+			}
+		}
+		if (opened) {
 			urlOpen = false;
 			url = '';
-		} catch {
-			notice = 'Não deu para abrir esse endereço.';
-		} finally {
-			opening = false;
-		}
+		} else if (alive) notice = 'Não deu para abrir esse endereço. Tente de novo.';
+		opening = false;
 	}
 
 	// Gesto na tela remota: toque simples vira tap; arrasto vertical vira rolagem.
@@ -571,8 +584,13 @@
 				{/if}
 			{/if}
 			{#if opening}
-				<div class="absolute inset-0 grid place-items-center bg-paper/70 text-sm font-medium">
-					Abrindo…
+				<div
+					class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-paper/80 text-sm font-medium"
+					role="status"
+				>
+					Abrindo o navegador…
+					<span class="progress" aria-hidden="true"><span></span></span>
+					<span class="t-caption font-normal">Pode levar uns 10 segundos.</span>
 				</div>
 			{/if}
 		</div>
@@ -600,6 +618,29 @@
 </div>
 
 <style>
+	/* Progresso estimado da abertura: enche em ~15 s e espera perto do fim. */
+	.progress {
+		width: 9rem;
+		height: 3px;
+		border-radius: 2px;
+		background: var(--color-line);
+		overflow: hidden;
+	}
+	.progress span {
+		display: block;
+		height: 100%;
+		background: var(--color-primary);
+		transform-origin: left;
+		animation: fill 15s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+	}
+	@keyframes fill {
+		from {
+			transform: scaleX(0.03);
+		}
+		to {
+			transform: scaleX(0.94);
+		}
+	}
 	.screen.control,
 	.screen.pannable {
 		touch-action: none;

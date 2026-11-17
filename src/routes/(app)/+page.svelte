@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { ApiError } from '#lib/client/api.ts';
 	import {
+		applicationsQuery,
 		feedQuery,
 		keys,
 		searchMutation,
@@ -24,6 +25,10 @@
 	const collecting = $derived(search.isPending || run.data?.status === 'running');
 	const feed = createQuery(() => feedQuery(collecting));
 	const swipe = createMutation(() => swipeMutation(client));
+
+	// Inscrições paradas esperando a pessoa: um toque leva ao visor.
+	const applications = createQuery(() => applicationsQuery());
+	const waiting = $derived((applications.data ?? []).filter((a) => a.status === 'needs_user'));
 
 	// Durante a busca só entram vagas já avaliadas: card sem nota nem resumo não ajuda a decidir.
 	const fresh = $derived((feed.data ?? []).filter((job) => !collecting || job.matchScore !== null));
@@ -135,6 +140,21 @@
 			<Icon name="sliders" />
 		</a>
 	</header>
+
+	{#if waiting.length > 0}
+		<a
+			href={resolve(`/(app)/inscricoes?open=${encodeURIComponent(waiting[0].id)}`)}
+			class="mx-4 mb-1 flex min-h-11 shrink-0 items-center gap-2 rounded-sm bg-primary-tint px-3 text-sm font-medium text-primary-deep"
+		>
+			<Icon name="alert" size={18} />
+			<span class="flex-1">
+				{waiting.length === 1
+					? '1 inscrição precisa de você'
+					: `${waiting.length} inscrições precisam de você`}
+			</span>
+			<Icon name="chevron" size={16} />
+		</a>
+	{/if}
 
 	<!-- A pilha cruza a fronteira entre o papel e a faixa, sobre a pincelada. -->
 	<div class="stage relative flex min-h-0 flex-1 flex-col">

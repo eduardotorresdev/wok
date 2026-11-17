@@ -2,7 +2,14 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import type { PageRouteId } from '$app/types';
+	import { createQuery } from '@tanstack/svelte-query';
+	import { applicationsQuery } from '#lib/client/queries.ts';
 	import Icon, { type IconName } from './Icon.svelte';
+
+	const applications = createQuery(() => applicationsQuery());
+	const waiting = $derived(
+		(applications.data ?? []).filter((a) => a.status === 'needs_user').length
+	);
 
 	const items: {
 		href: PageRouteId;
@@ -44,8 +51,20 @@
 						? 'text-ink'
 						: 'text-ink-soft'}"
 				>
-					<Icon name={item.icon} size={22} stroke={active ? 1.9 : 1.6} />
-					<span>{item.label}</span>
+					<span class="relative">
+						<Icon name={item.icon} size={22} stroke={active ? 1.9 : 1.6} />
+						{#if item.path === '/inscricoes' && waiting > 0}
+							<span
+								class="absolute -top-1.5 -right-2.5 grid h-[1.125rem] min-w-[1.125rem] place-items-center rounded-full bg-primary px-1 text-[0.6875rem] leading-none font-semibold text-paper"
+								aria-hidden="true">{waiting > 9 ? '9+' : waiting}</span
+							>
+						{/if}
+					</span>
+					<span>
+						{item.label}{#if item.path === '/inscricoes' && waiting > 0}<span class="sr-only"
+								>, {waiting === 1 ? '1 precisa de você' : `${waiting} precisam de você`}</span
+							>{/if}
+					</span>
 					{#if active}
 						<svg
 							class="absolute bottom-1 h-1.5 w-7"

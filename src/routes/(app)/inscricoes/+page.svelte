@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createQuery } from '@tanstack/svelte-query';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { relativeTime } from '#lib/client/format.ts';
 	import { applicationsQuery } from '#lib/client/queries.ts';
 	import type { Application } from '#lib/client/types.ts';
@@ -32,6 +33,18 @@
 			(a, b) => order[a.status] - order[b.status] || b.updatedAt.localeCompare(a.updatedAt)
 		)
 	);
+
+	// /inscricoes?open=<id> (link do email e da faixa da home) abre o detalhe direto.
+	let opened: string | null = null;
+	$effect(() => {
+		const wanted = page.url.searchParams.get('open');
+		if (!wanted || wanted === opened) return;
+		const target = list.find((a) => a.id === wanted);
+		if (!target) return;
+		opened = wanted;
+		selectedJob = target.job.id;
+		open = true;
+	});
 
 	function show(app: Application) {
 		selectedJob = app.job.id;

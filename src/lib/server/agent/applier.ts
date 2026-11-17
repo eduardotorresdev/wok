@@ -502,6 +502,18 @@ export async function applyToJob(input: ApplyInput): Promise<ApplyOutcome> {
 			}
 
 			input.onStep('action', String(args.intent), { tool: name, url: browser.url() });
+			// An application cannot be undone: what may send it is written down BEFORE
+			// it is done, so a run that dies right after is never repeated blindly.
+			const noteIfFinalSubmit = async (label: string) => {
+				if (label !== 'Enter' && !FINAL_SUBMIT.test(label)) return;
+				input.onStep(
+					'submit_attempt',
+					label === 'Enter'
+						? 'Vou pressionar Enter, o que pode enviar o formulário.'
+						: `Vou tocar em "${label.trim().slice(0, 80)}", que parece enviar a candidatura.`,
+					{ url: browser.url() }
+				);
+			};
 			try {
 				let content: Anthropic.ToolResultBlockParam['content'];
 				switch (name) {
@@ -517,10 +529,12 @@ export async function applyToJob(input: ApplyInput): Promise<ApplyOutcome> {
 							content = `Clique recusado (modo de teste): "${label.trim().slice(0, 80)}" parece ser o botão que envia a candidatura. Se tudo está preenchido e revisado, chame report_ready_to_submit.`;
 							break;
 						}
+						if (!input.dryRun) await noteIfFinalSubmit(await browser.label(String(args.ref)));
 						content = await browser.click(String(args.ref));
 						break;
 					}
 					case 'browser_type':
+						if (args.submit === true && !input.dryRun) await noteIfFinalSubmit('Enter');
 						content = await browser.type(
 							String(args.ref),
 							String(args.text),
@@ -536,6 +550,7 @@ export async function applyToJob(input: ApplyInput): Promise<ApplyOutcome> {
 								'Tecla recusada (modo de teste): Enter pode enviar o formulário. Use os botões da página.';
 							break;
 						}
+						if (/^(enter|numpadenter)$/i.test(String(args.key))) await noteIfFinalSubmit('Enter');
 						content = await browser.press(String(args.key));
 						break;
 					case 'browser_scroll':

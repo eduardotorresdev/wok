@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const rows = new Map<string, { status: string; message: string }>();
+const rows = new Map<string, { status: string; message: string; needsKind?: string }>();
 
 vi.mock('../lifecycle.ts', () => ({ isStopping: () => false }));
 vi.mock('./store.ts', () => ({
@@ -10,7 +10,14 @@ vi.mock('./store.ts', () => ({
 	unfinished: () => []
 }));
 
-const { enqueue, setRunner, RetryLater, REQUEUE_WAITS_MS } = await import('./queue.ts');
+const {
+	enqueue,
+	setRunner,
+	RetryLater,
+	MaybeSubmitted,
+	MAYBE_SUBMITTED_MESSAGE,
+	REQUEUE_WAITS_MS
+} = await import('./queue.ts');
 
 afterEach(() => {
 	vi.useRealTimers();
@@ -54,6 +61,33 @@ describe('queue', () => {
 		expect(runs).toBe(3);
 		expect(rows.get('a2')?.status).toBe('failed');
 		expect(rows.get('a2')?.message).toMatch(/Tentei 3 vezes/);
+	});
+
+	it('never repeats a run that died after it may have sent the application', async () => {
+		vi.useFakeTimers();
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		rows.set('a4', { status: 'applying', message: '' });
+		let runs = 0;
+		const paused: string[] = [];
+		setRunner(
+			async () => {
+				runs++;
+				throw new MaybeSubmitted('Connection error.');
+			},
+			(id) => paused.push(id)
+		);
+		enqueue('u1', 'a4');
+		await vi.advanceTimersByTimeAsync(10);
+		expect(rows.get('a4')).toEqual({
+			status: 'needs_user',
+			message: MAYBE_SUBMITTED_MESSAGE,
+			needsKind: 'browser'
+		});
+		expect(paused).toEqual(['a4']);
+		// However long it waits, it is not run again on its own.
+		await vi.advanceTimersByTimeAsync(REQUEUE_WAITS_MS[0] + REQUEUE_WAITS_MS[1] + 60_000);
+		expect(runs).toBe(1);
+		expect(rows.get('a4')?.status).toBe('needs_user');
 	});
 
 	it('fails at once on an error that is not a passing one', async () => {

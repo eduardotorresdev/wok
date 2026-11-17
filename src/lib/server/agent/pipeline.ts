@@ -7,7 +7,13 @@ import {
 	setStatus,
 	update
 } from '../applications/store.ts';
-import { enqueue, RetryLater, setRunner } from '../applications/queue.ts';
+import {
+	enqueue,
+	MAYBE_SUBMITTED_MESSAGE,
+	MaybeSubmitted,
+	RetryLater,
+	setRunner
+} from '../applications/queue.ts';
 import { isTransient } from '../retry.ts';
 import {
 	acquireForAgent,
@@ -165,10 +171,12 @@ async function runApplication(applicationId: string) {
 		);
 	}
 	const history = listSteps(applicationId)
-		.filter((s) => ['action', 'status', 'user_answer'].includes(s.kind))
+		.filter((s) => ['action', 'status', 'user_answer', 'submit_attempt'].includes(s.kind))
 		.slice(-25)
 		.map((s) => s.message);
 	const hadAttempt = listSteps(applicationId).some((s) => s.kind === 'action');
+	// Set once this run does anything that may send the application.
+	let maySend = false;
 	const dryRun = config.applyDryRunFor(user?.email ?? '');
 	setStatus(
 		applicationId,
@@ -208,11 +216,19 @@ async function runApplication(applicationId: string) {
 			history: hadAttempt ? history : [],
 			dryRun,
 			onStep: (kind, message, data) => {
+				if (kind === 'submit_attempt') maySend = true;
 				setLastUrl(applicationId, agentBrowser.url());
 				logStep(applicationId, kind, message, data);
 			}
 		});
 	} catch (err) {
+		if (isTransient(err) && maySend) {
+			// It may already be sent: the page stays as it is for the person to check,
+			// and nothing is repeated on its own.
+			if (browser) setLastUrl(applicationId, browser.url());
+			await releaseFromAgent(userId, applicationId, 'user');
+			throw new MaybeSubmitted(describeLlmError(err), { cause: err });
+		}
 		if (isTransient(err)) {
 			// The connection dropped mid-form: close the tab and start over later,
 			// rather than calling the application failed.
@@ -344,11 +360,13 @@ export function registerPipeline() {
 	setRunner(async (applicationId) => {
 		await runApplication(applicationId);
 		await notifyIfPaused(applicationId);
-	});
+	}, notifyIfPaused);
 	// After a restart nothing is watching paused applications; the watch comes back
 	// together with the tab, when the person opens the viewer, not before.
 	setPausedTabSource(pausedTab, (userId, applicationId) => {
-		if (getRow(applicationId)?.needsKind === 'browser') {
+		const row = getRow(applicationId);
+		// A doubt about a sent application is settled by the person, never by a watcher.
+		if (row?.needsKind === 'browser' && row.lastMessage !== MAYBE_SUBMITTED_MESSAGE) {
 			resumeWhenBarrierClears(userId, applicationId);
 		}
 	});

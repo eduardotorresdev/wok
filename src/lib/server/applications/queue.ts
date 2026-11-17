@@ -15,11 +15,24 @@ let runner: Runner | undefined;
  */
 export class RetryLater extends Error {}
 
+/**
+ * The run died of a passing failure AFTER doing something that may have sent
+ * the application. Never repeated automatically: the person checks the page.
+ */
+export class MaybeSubmitted extends Error {}
+
+export const MAYBE_SUBMITTED_MESSAGE =
+	'Posso ter enviado esta candidatura antes de a conexão cair. Confira na página se ela consta como enviada.';
+
 export const REQUEUE_WAITS_MS = [30_000, 120_000];
 const requeues = new Map<string, number>();
 
-export function setRunner(fn: Runner) {
+let onPaused: ((applicationId: string) => unknown) | undefined;
+
+/** `paused` runs after the queue itself pauses an application (it may notify the person). */
+export function setRunner(fn: Runner, paused?: (applicationId: string) => unknown) {
 	runner = fn;
+	onPaused = paused;
 }
 
 export function enqueue(userId: string, applicationId: string) {
@@ -37,6 +50,12 @@ export function enqueue(userId: string, applicationId: string) {
 			if (isStopping()) return;
 			const row = getRow(applicationId);
 			const settled = !row || row.status === 'submitted' || row.status === 'needs_user';
+			if (err instanceof MaybeSubmitted && !settled) {
+				requeues.delete(applicationId);
+				console.warn(`[queue] application ${applicationId} may have been sent: ${err.message}`);
+				setStatus(applicationId, 'needs_user', MAYBE_SUBMITTED_MESSAGE, { needsKind: 'browser' });
+				return void onPaused?.(applicationId);
+			}
 			if (err instanceof RetryLater && !settled) {
 				const done = requeues.get(applicationId) ?? 0;
 				if (done < REQUEUE_WAITS_MS.length) {

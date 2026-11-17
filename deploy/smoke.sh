@@ -69,6 +69,9 @@ echo "smoke em $BASE (release $(cat "$APP_ROOT/current/build/REVISION" 2>/dev/nu
 # Local: prova o app em si, independente de DNS/túnel.
 check "local /api/health 200 ($LOCAL)"            http_is "$LOCAL/api/health" 200
 check "local / sem sessão -> 303 /login"          redirects_to_login "$LOCAL/"
+for r in onboarding curriculo ajustes; do
+	check "local /$r sem sessão -> 303 /login"       redirects_to_login "$LOCAL/$r"
+done
 check "local /login 200"                          http_is "$LOCAL/login" 200
 check "local /api/auth respondendo (/api/auth/ok)" http_is "$LOCAL/api/auth/ok" 200
 check "magic link real via Resend -> $EMAIL"      magic_link
@@ -76,6 +79,9 @@ check "local /api/jobs/feed sem sessão -> 401 JSON"    unauthorized_json "$LOCA
 check "local /api/applications sem sessão -> 401 JSON" unauthorized_json "$LOCAL/api/applications"
 # Público: DNS + túnel + TLS.
 check "HTTPS $BASE/ -> 303 /login"                redirects_to_login "$BASE/"
+for r in onboarding curriculo ajustes; do
+	check "HTTPS /$r sem sessão -> 303 /login"       redirects_to_login "$BASE/$r"
+done
 check "HTTPS $BASE/login 200"                     http_is "$BASE/login" 200
 check "HTTPS $BASE/api/health 200"                http_is "$BASE/api/health" 200
 check "HTTPS $BASE/api/auth/ok 200"               http_is "$BASE/api/auth/ok" 200

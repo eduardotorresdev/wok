@@ -193,11 +193,11 @@
 	{#if noAccount}
 		<button
 			type="button"
-			class="mx-4 mb-1 flex min-h-11 shrink-0 items-center gap-2 rounded-sm bg-band px-3 text-left text-sm font-medium"
+			class="mx-4 mb-1 flex min-h-11 shrink-0 items-center gap-2 rounded-sm bg-band px-3 text-left text-[0.8125rem] font-medium"
 			onclick={() => connect('linkedin')}
 		>
 			<Icon name="alert" size={18} />
-			<span class="flex-1">Conecte o LinkedIn para começar a se inscrever</span>
+			<span class="min-w-0 flex-1 truncate">Conecte o LinkedIn para começar a se inscrever</span>
 			<Icon name="chevron" size={16} />
 		</button>
 	{/if}

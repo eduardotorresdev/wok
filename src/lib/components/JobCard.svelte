@@ -35,6 +35,11 @@
 	const posted = $derived(relativeTime(job.postedAt));
 	const via = $derived(applyViaLabel(job));
 	const blocked = $derived(blockedProvider(job));
+
+	// Altura livre para o resumo, medida no card; 22.5px é a linha do resumo (15px × 1.5).
+	const LINE = 22.5;
+	let room = $state(0);
+	const lines = $derived(Math.min(5, Math.floor((room + 0.5) / LINE)));
 	const hasScore = $derived(scorePercent(job.matchScore) !== null);
 </script>
 
@@ -60,7 +65,7 @@
 {#snippet connect()}
 	{#if blocked}
 		<p
-			class="mt-1 flex items-center gap-1.5 text-[0.8125rem] leading-snug font-medium text-primary-deep"
+			class="mt-1 flex shrink-0 items-center gap-1.5 text-[0.8125rem] leading-snug font-medium text-primary-deep"
 		>
 			<Icon name="alert" size={14} />Conecte o {PROVIDER_NAME[blocked]} para se inscrever
 		</p>
@@ -85,7 +90,7 @@
 			inert={flipped || !interactive}
 			onclick={() => onflip?.(true)}
 		>
-			<header class="flex items-start justify-between gap-3">
+			<header class="flex shrink-0 items-start justify-between gap-3">
 				<div class="flex min-w-0 items-center gap-3">
 					<CompanyAvatar name={job.company} logo={job.companyLogo} />
 					<div class="min-w-0">
@@ -96,30 +101,40 @@
 				<ScoreMark score={job.matchScore} />
 			</header>
 
-			<h2 class="title mt-4 font-serif">{job.title}</h2>
+			<h2 class="title mt-4 shrink-0 font-serif">{job.title}</h2>
 
-			<p class="mt-2 text-[0.9375rem] leading-snug text-ink-soft">
+			<p class="mt-2 shrink-0 truncate text-[0.9375rem] leading-snug text-ink-soft">
 				{job.location ?? 'Local não informado'}{#if job.salary}<span class="sep"></span><span
 						class="text-ink">{job.salary}</span
 					>{/if}
 			</p>
 
 			{#if via && !blocked}
-				<p class="t-caption mt-1 flex items-center gap-1.5"><Icon name="send" size={14} />{via}</p>
+				<p class="t-caption mt-1 flex shrink-0 items-center gap-1.5">
+					<Icon name="send" size={14} />{via}
+				</p>
 			{/if}
 			{@render connect()}
 
-			{#if job.summary}
-				<p class="summary mt-3 text-[0.9375rem] leading-normal">{job.summary}</p>
-			{/if}
+			<!-- O resumo ocupa o que sobrar, em linhas inteiras: nada é cortado no meio. -->
+			<div class="mt-3 min-h-0 flex-1 overflow-hidden" bind:clientHeight={room}>
+				{#if job.summary && lines > 0}
+					<p
+						class="summary text-[0.9375rem]"
+						style="-webkit-line-clamp: {lines}; line-clamp: {lines}"
+					>
+						{job.summary}
+					</p>
+				{/if}
+			</div>
 
-			<div class="mt-auto pt-3">
+			<div class="shrink-0">
 				{#if job.matchReasons.length}
 					<ul class="space-y-1.5 border-t border-line pt-3">
 						{#each job.matchReasons.slice(0, job.summary ? 3 : 4) as reason (reason)}
 							<li class="flex gap-2 text-sm leading-snug">
 								{@render tick(16)}
-								<span class="line-clamp-2">{reason}</span>
+								<span class="reason">{reason}</span>
 							</li>
 						{/each}
 					</ul>
@@ -295,36 +310,31 @@
 	}
 	.summary {
 		display: -webkit-box;
-		-webkit-line-clamp: 4;
-		line-clamp: 4;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		line-height: 22.5px;
+	}
+	.reason {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}
-	.stamp {
-		position: absolute;
-		top: 38%;
-		z-index: 2;
-		padding: 4px 14px 6px;
-		font-family: var(--font-serif);
-		font-size: 2.25rem;
-		line-height: 1.1;
-		background: var(--color-paper);
-		border-radius: var(--radius-sm);
-		pointer-events: none;
-		white-space: nowrap;
+	/* Em telas baixas o card encolhe por linhas inteiras, nunca no meio de uma. */
+	.front {
+		container-type: size;
 	}
-	.stamp-apply {
-		left: 16px;
-		color: var(--color-primary-deep);
-		box-shadow:
-			inset 0 0 0 2px var(--color-primary),
-			var(--shadow-paper);
+	@container (max-height: 450px) {
+		.reason {
+			-webkit-line-clamp: 1;
+			line-clamp: 1;
+		}
 	}
-	.stamp-skip {
-		right: 16px;
-		color: var(--color-ink-soft);
-		box-shadow:
-			inset 0 0 0 2px var(--color-ink-soft),
-			var(--shadow-paper);
+	@container (max-height: 400px) {
+		.title {
+			-webkit-line-clamp: 2;
+			line-clamp: 2;
+		}
 	}
 </style>

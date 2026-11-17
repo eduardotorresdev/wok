@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import type { AgentBrowser } from '../browser/service.ts';
 import type { ProfileDto, ConfirmedAnswerDto } from '../profile.ts';
-import { EFFORT, LlmRefusal, MODEL, anthropic } from './llm.ts';
+import { EFFORT, LlmRefusal, MODEL, anthropic, structured } from './llm.ts';
 import { matchArea, playbooks } from './playbooks.ts';
 
 const MAX_TURNS = 70;
@@ -316,6 +316,53 @@ function userMessage(input: ApplyInput) {
 	return blocks.join('\n\n');
 }
 
+const Covered = z.object({
+	covered: z.boolean(),
+	answer: z.string(),
+	source: z.string()
+});
+
+const COVERED_SYSTEM = `Um agente está preenchendo uma candidatura em nome de uma pessoa e quer pausar para perguntar algo a ela. Antes de interrompê-la, você confere se ela já respondeu isso.
+
+Você recebe a pergunta, os dados estruturados do perfil, as respostas que ela já confirmou em outras candidaturas e, quando existir, o perfil profissional em markdown.
+
+Devolva covered=true só quando um desses materiais responde à pergunta de forma explícita, ainda que com outras palavras (por exemplo, "Qual sua expectativa de remuneração CLT?" é respondida por uma pretensão salarial CLT registrada). Nesse caso, answer traz a resposta com as palavras e os números da pessoa e source diz de onde veio ("resposta confirmada", "perfil" ou "perfil profissional").
+
+Devolva covered=false, com answer e source vazios, quando:
+- a resposta teria de ser deduzida, estimada ou adaptada (outro regime de contratação, outro país, outra data, outra ferramenta);
+- a pergunta é eliminatória ou declaratória (autorização de trabalho, disponibilidade para mudança ou viagem, deficiência, parentesco, antecedentes, aceite de termos) e não há resposta explícita para exatamente isso;
+- o campo do perfil está vazio: vazio significa "não informado", nunca "não".
+
+Na dúvida, covered=false: perguntar de novo custa pouco; responder errado em nome da pessoa não.`;
+
+/**
+ * Before pausing for a question, checks whether the person already answered
+ * it somewhere, even in other words. Returns the answer, or null to pause.
+ */
+export async function alreadyAnswered(
+	input: Pick<ApplyInput, 'answers' | 'profile' | 'profileContext'>,
+	question: string
+) {
+	if (!input.answers.length && !input.profileContext && !input.profile.updatedAt) return null;
+	try {
+		const out = await structured({
+			schema: Covered,
+			system: COVERED_SYSTEM,
+			context: input.profileContext,
+			maxTokens: 2000,
+			user: `<pergunta>\n${question}\n</pergunta>\n\n<perfil>\n${JSON.stringify(input.profile, null, 1)}\n</perfil>\n\n<respostas_confirmadas>\n${
+				input.answers.map((a) => `P: ${a.question}\nR: ${a.answer}`).join('\n\n') || '(nenhuma)'
+			}\n</respostas_confirmadas>`
+		});
+		return out.covered && out.answer.trim()
+			? { answer: out.answer.trim(), source: out.source.trim() }
+			: null;
+	} catch {
+		// The check is a courtesy; when it fails the person is simply asked.
+		return null;
+	}
+}
+
 function errorText(err: unknown) {
 	return (err instanceof Error ? err.message : String(err)).split('\n').slice(0, 4).join('\n');
 }
@@ -335,6 +382,8 @@ export async function applyToJob(input: ApplyInput): Promise<ApplyOutcome> {
 		});
 	}
 	let nudges = 0;
+	// A question the check answered once is not checked again: asking twice means it did not help.
+	const reused = new Set<string>();
 
 	for (let turn = 0; turn < MAX_TURNS; turn++) {
 		const message = await anthropic()
@@ -406,6 +455,21 @@ export async function applyToJob(input: ApplyInput): Promise<ApplyOutcome> {
 
 			if (name === 'ask_user') {
 				const question = String(args.question);
+				const known = reused.has(question) ? null : await alreadyAnswered(input, question);
+				if (known) {
+					reused.add(question);
+					input.onStep(
+						'answer_reused',
+						`Não precisei perguntar "${question}": você já tinha respondido (${known.source || 'resposta anterior'}).`,
+						{ question, answer: known.answer, source: known.source }
+					);
+					results.push({
+						type: 'tool_result',
+						tool_use_id: call.id,
+						content: `A pessoa não foi interrompida: ela já respondeu isso (${known.source || 'resposta anterior'}). Resposta: ${known.answer}\nUse exatamente essa resposta e continue a candidatura. Se ela não servir para o campo, chame ask_user de novo com a mesma pergunta.`
+					});
+					continue;
+				}
 				outcome = {
 					type: 'ask_user',
 					question,

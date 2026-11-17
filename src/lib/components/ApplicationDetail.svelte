@@ -96,6 +96,25 @@
 		});
 	}
 
+	// O tipo da pergunta escolhe o teclado e, para sim/não, oferece as respostas prontas.
+	const ask = $derived.by(() => {
+		const q = (app?.pendingQuestion ?? '').toLowerCase();
+		if (/telefone|celular|whatsapp|phone|\bddd\b/.test(q)) return 'tel';
+		if (
+			/sal[aá]ri|pretens|remunera|salary|compensation|quantos anos|anos de experi|how many years/.test(
+				q
+			)
+		)
+			return 'number';
+		if (
+			/\(sim\s*\/\s*n[aã]o\)|yes\s*\/\s*no|^(você|voce)\s+(tem|possui|é|está|esta|aceita|pode|já|ja|precisa|concorda|mora|trabalha|fala|gostaria)\b|^(tem|possui|aceita|pode|está|é|há|existe)\b|^(do|are|have|is|will|can|would|did)\s+you\b/.test(
+				q
+			)
+		)
+			return 'yesno';
+		return 'text';
+	});
+
 	function sendAnswer() {
 		const text = reply.trim();
 		if (!text || !app) return;
@@ -149,14 +168,57 @@
 			<section class="mt-3 rounded-sm bg-primary-tint p-4">
 				<p class="t-caption text-primary-deep">O formulário pergunta</p>
 				<p class="t-title mt-1">{app.pendingQuestion}</p>
-				<label for="reply" class="sr-only">Sua resposta</label>
-				<textarea
-					id="reply"
-					class="field mt-3"
-					rows="3"
-					maxlength="2000"
-					placeholder="Sua resposta"
-					bind:value={reply}></textarea>
+				<form
+					onsubmit={(event) => {
+						event.preventDefault();
+						sendAnswer();
+					}}
+				>
+					{#if ask === 'yesno'}
+						<div class="mt-3 flex gap-2">
+							{#each ['Sim', 'Não'] as option (option)}
+								<button
+									type="button"
+									class="chip flex-1 justify-center"
+									aria-pressed={reply.trim() === option}
+									onclick={() => (reply = option)}
+								>
+									{option}
+								</button>
+							{/each}
+						</div>
+					{/if}
+					<label for="reply" class="sr-only">Sua resposta</label>
+					{#if ask === 'tel' || ask === 'number'}
+						<input
+							id="reply"
+							class="field mt-3"
+							type={ask === 'tel' ? 'tel' : 'text'}
+							inputmode={ask === 'tel' ? 'tel' : 'decimal'}
+							autocomplete={ask === 'tel' ? 'tel' : 'off'}
+							enterkeyhint="send"
+							maxlength="200"
+							placeholder={ask === 'tel' ? '(11) 91234-5678' : 'Sua resposta'}
+							bind:value={reply}
+						/>
+					{:else}
+						<textarea
+							id="reply"
+							class="field mt-3"
+							rows={ask === 'yesno' ? 2 : 3}
+							maxlength="2000"
+							enterkeyhint="send"
+							placeholder={ask === 'yesno' ? 'Ou escreva sua resposta' : 'Sua resposta'}
+							bind:value={reply}
+							onkeydown={(event) => {
+								// Enter envia; Shift+Enter quebra a linha.
+								if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+									event.preventDefault();
+									sendAnswer();
+								}
+							}}></textarea>
+					{/if}
+				</form>
 				<p class="t-caption mt-2">
 					A resposta fica salva e o agente reutiliza nas próximas inscrições.
 				</p>

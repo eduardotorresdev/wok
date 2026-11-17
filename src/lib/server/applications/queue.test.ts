@@ -5,8 +5,12 @@ const rows = new Map<string, { status: string; message: string; needsKind?: stri
 vi.mock('../lifecycle.ts', () => ({ isStopping: () => false }));
 vi.mock('./store.ts', () => ({
 	getRow: (id: string) => rows.get(id),
-	setStatus: (id: string, status: string, message: string) =>
-		void rows.set(id, { status, message }),
+	setStatus: (id: string, status: string, message: string, extra?: { needsKind?: string }) =>
+		void rows.set(id, {
+			status,
+			message,
+			...(extra?.needsKind ? { needsKind: extra.needsKind } : {})
+		}),
 	unfinished: () => []
 }));
 

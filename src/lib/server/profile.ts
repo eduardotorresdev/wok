@@ -84,6 +84,39 @@ export function saveProfile(userId: string, data: ProfileData): ProfileDto {
 	return getProfile(userId);
 }
 
+/**
+ * What every application form asks for. When one is missing the application
+ * pauses with the matching question before any form is opened, and the answer
+ * goes into the profile itself.
+ */
+const REQUIRED: { field: 'fullName' | 'phone'; question: string }[] = [
+	{
+		field: 'fullName',
+		question: 'Qual é o seu nome completo, como deve aparecer nas candidaturas?'
+	},
+	{
+		field: 'phone',
+		question: 'Qual é o seu telefone com DDD, para os recrutadores entrarem em contato?'
+	}
+];
+
+export function missingProfileQuestion(profile: ProfileData): string | null {
+	return REQUIRED.find((r) => !profile[r.field].trim())?.question ?? null;
+}
+
+/** Stores the answer in the profile when the question was about a profile field. */
+export function applyProfileAnswer(userId: string, question: string, answer: string): boolean {
+	const match = REQUIRED.find((r) => r.question === question);
+	if (!match) return false;
+	const current: Partial<ProfileDto> = getProfile(userId);
+	delete current.updatedAt;
+	saveProfile(userId, {
+		...(current as ProfileData),
+		[match.field]: answer.trim().slice(0, 200)
+	});
+	return true;
+}
+
 export function normalizeQuestion(question: string) {
 	return question
 		.normalize('NFD')

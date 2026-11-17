@@ -5,8 +5,9 @@ import { acquireForAgent, releaseFromAgent } from '../browser/service.ts';
 import { db, schema, sqlite } from '../db/index.ts';
 import { compileLatex, userDir } from '../latex.ts';
 import { getPreferences } from '../preferences.ts';
-import { getProfile, listAnswers } from '../profile.ts';
-import { getResumeRow } from '../resume.ts';
+import { config } from '../env.ts';
+import { getProfile, listAnswers, missingProfileQuestion } from '../profile.ts';
+import { compileResume, getResume, getResumeRow } from '../resume.ts';
 import { applyToJob, type ApplyOutcome } from './applier.ts';
 import { describeLlmError, hasLlm } from './llm.ts';
 import { getAreaStrategy, researchArea } from './researcher.ts';
@@ -42,6 +43,34 @@ async function runApplication(applicationId: string) {
 	const prefs = getPreferences(userId);
 	const profile = getProfile(userId);
 	const area = prefs.area || prefs.terms[0] || '';
+
+	// ------------------------------------------------------------ before any form
+	// Every form asks for name and phone; asking now is cheaper than stopping mid-form.
+	const missing = missingProfileQuestion(profile);
+	if (missing) {
+		return void setStatus(
+			applicationId,
+			'needs_user',
+			`Antes de começar, preciso de um dado seu: ${missing}`,
+			{
+				needsKind: 'question',
+				pendingQuestion: missing
+			}
+		);
+	}
+	// A base résumé that does not compile cannot be tailored; the person fixes it and resumes.
+	if (!app.tailoredPdfPath && getResume(userId).pages === null) {
+		logStep(applicationId, 'tailor', 'Conferindo se o seu currículo base compila.');
+		const base = await compileResume(userId);
+		if (!base?.ok) {
+			return void setStatus(
+				applicationId,
+				'needs_user',
+				'Seu currículo base não compila, então não consigo adaptá-lo. Corrija o LaTeX na tela Currículo e toque em retomar.',
+				{ needsKind: 'question' }
+			);
+		}
+	}
 	const workDir = userDir(userId, 'applications', applicationId);
 
 	// ------------------------------------------------------------ tailoring
@@ -74,10 +103,12 @@ async function runApplication(applicationId: string) {
 			update(applicationId, { tailoredLatex, tailoredPdfPath: pdfPath });
 			if (result.note) logStep(applicationId, 'tailor_note', result.note);
 		} catch (err) {
+			// Nothing is sent without a one-page résumé; the person can adjust the base and resume.
 			return void setStatus(
 				applicationId,
-				'failed',
-				`Não consegui adaptar o currículo: ${describeLlmError(err)}`
+				'needs_user',
+				`Não consegui adaptar o currículo para 1 página: ${describeLlmError(err)} Ajuste o currículo base se quiser e toque em retomar.`,
+				{ needsKind: 'question' }
 			);
 		}
 	}
@@ -115,13 +146,14 @@ async function runApplication(applicationId: string) {
 			area,
 			areaStrategy: strategy,
 			history: hadAttempt ? history : [],
+			dryRun: config.applyDryRun,
 			onStep: (kind, message, data) => logStep(applicationId, kind, message, data)
 		});
 	} catch (err) {
 		outcome = { type: 'failed', message: `Erro durante a candidatura: ${describeLlmError(err)}` };
 	}
 
-	if (outcome.type === 'needs_browser' || outcome.type === 'ask_user') {
+	if (outcome.type !== 'submitted' && outcome.type !== 'failed') {
 		// The page stays open and the person can act on it right away.
 		await releaseFromAgent(userId, 'user', true);
 		logStep(applicationId, 'control', 'O browser está com você.', { controller: 'user' });
@@ -138,6 +170,13 @@ async function runApplication(applicationId: string) {
 				needsKind: 'question',
 				pendingQuestion: outcome.question
 			});
+		case 'ready':
+			return void setStatus(
+				applicationId,
+				'needs_user',
+				`Pronto para enviar (modo de teste, nada foi enviado). ${outcome.message}`,
+				{ needsKind: 'browser' }
+			);
 		case 'needs_browser':
 			return void setStatus(applicationId, 'needs_user', outcome.message, { needsKind: 'browser' });
 		case 'failed':

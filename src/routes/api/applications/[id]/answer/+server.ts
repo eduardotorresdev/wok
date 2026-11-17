@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { enqueue } from '#lib/server/applications/queue.ts';
 import { getApplication, getRow, logStep, setStatus } from '#lib/server/applications/store.ts';
 import { ApiError, api, parseBody, requireUser } from '#lib/server/http.ts';
-import { saveAnswer } from '#lib/server/profile.ts';
+import { applyProfileAnswer, saveAnswer } from '#lib/server/profile.ts';
 
 const Body = z.object({ answer: z.string().trim().min(1).max(2000) });
 
@@ -24,7 +24,10 @@ export const POST = api(async (event) => {
 			'Esta inscrição não está esperando uma resposta.'
 		);
 	}
-	saveAnswer(user.id, row.pendingQuestion, answer);
+	// Name and phone belong in the profile; everything else becomes a reusable answer.
+	if (!applyProfileAnswer(user.id, row.pendingQuestion, answer)) {
+		saveAnswer(user.id, row.pendingQuestion, answer);
+	}
 	logStep(id, 'user_answer', `Você respondeu: ${answer}`, {
 		question: row.pendingQuestion,
 		answer

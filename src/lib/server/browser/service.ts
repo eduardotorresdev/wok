@@ -443,6 +443,8 @@ const SNAPSHOT_CHARS = 28_000;
 /** What the applier agent can do. Every method acts on the page the user is watching. */
 export interface AgentBrowser {
 	url(): string;
+	/** Visible name of an element (text, aria-label or value), for checks before acting on it. */
+	label(ref: string): Promise<string>;
 	navigate(url: string): Promise<string>;
 	snapshot(): Promise<string>;
 	click(ref: string): Promise<string>;
@@ -468,6 +470,16 @@ function agentBrowser(session: Session): AgentBrowser {
 			.catch(() => '')}"`;
 	return {
 		url: () => page().url(),
+		async label(ref) {
+			return locate(ref)
+				.evaluate((el) => {
+					const input = el as HTMLInputElement;
+					return [el.getAttribute('aria-label'), (el as HTMLElement).innerText, input.value]
+						.filter(Boolean)
+						.join(' ');
+				})
+				.catch(() => '');
+		},
 		async navigate(raw) {
 			const url = await assertPublicUrl(raw);
 			await humanPause();

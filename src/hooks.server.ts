@@ -5,10 +5,11 @@ import { building } from '$app/env';
 import { auth, migrateAuth } from '#lib/server/auth.ts';
 import { registerPipeline } from '#lib/server/agent/pipeline.ts';
 import { recoverQueue } from '#lib/server/applications/queue.ts';
-import { closeAll } from '#lib/server/browser/service.ts';
+import { closeAll, resetUserActivity } from '#lib/server/browser/service.ts';
 import { installShutdown, onShutdown } from '#lib/server/lifecycle.ts';
 import { config } from '#lib/server/env.ts';
 import { apiError } from '#lib/server/http.ts';
+import { backfillApplyTypes } from '#lib/server/jobs/backfill.ts';
 import { failOrphanRuns } from '#lib/server/jobs/search.ts';
 
 export const init: ServerInit = async () => {
@@ -21,6 +22,9 @@ export const init: ServerInit = async () => {
 	if (once.__wokBooted) return;
 	once.__wokBooted = true;
 	failOrphanRuns();
+	resetUserActivity();
+	// One-off, in the background: never holds the boot.
+	void backfillApplyTypes().catch((err) => console.error('[backfill] applyType', err));
 	recoverQueue();
 	// Closing the contexts is what writes each user's browser profile to disk.
 	onShutdown(closeAll);

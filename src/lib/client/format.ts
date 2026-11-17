@@ -48,3 +48,31 @@ export function applyViaLabel(job: Pick<Job, 'applyVia'>) {
 	if (job.applyVia === 'glassdoor') return 'Inscrição pelo Glassdoor';
 	return null;
 }
+
+/**
+ * Erros de um log do TeX, inteiros. O log quebra as linhas em 79 colunas e continua
+ * mensagens de pacote em linhas "(pacote)   texto": aqui os pedaços voltam a ser uma frase.
+ */
+export function latexErrors(log: string): string[] {
+	const lines: string[] = [];
+	for (const line of log.split('\n')) {
+		const prev = lines.at(-1);
+		if (prev !== undefined && prev.length === 79 && !/^(!|l\.\d+ )/.test(line)) {
+			lines[lines.length - 1] = prev + line;
+		} else lines.push(line);
+	}
+	const found: string[] = [];
+	for (let i = 0; i < lines.length && found.length < 3; i += 1) {
+		if (!lines[i].startsWith('!')) continue;
+		let message = lines[i].replace(/^!\s*/, '');
+		let next = i + 1;
+		while (next < lines.length && next < i + 6 && /^\(\S+\)\s/.test(lines[next])) {
+			message += ' ' + lines[next].replace(/^\(\S+\)\s+/, '').trim();
+			next += 1;
+		}
+		const at = lines.slice(next, next + 8).find((l) => /^l\.\d+ /.test(l));
+		if (at) message += `\n${at.replace(/^l\.(\d+) /, 'linha $1: ')}`;
+		if (!found.includes(message)) found.push(message);
+	}
+	return found;
+}

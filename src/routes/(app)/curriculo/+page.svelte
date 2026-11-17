@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+	import { latexErrors } from '#lib/client/format.ts';
 	import { compileResumeMutation, resumeQuery, saveResumeMutation } from '#lib/client/queries.ts';
 	import Icon from '#lib/components/Icon.svelte';
 	import PdfPreview from '#lib/components/PdfPreview.svelte';
@@ -60,15 +61,25 @@
 		}
 	}
 
-	/** As linhas do log que começam com "!" são os erros de LaTeX. */
+	// O servidor pode mandar as mensagens já inteiras; senão elas são remontadas do log.
 	const errorLines = $derived(
 		failure
-			? failure.log
-					.split('\n')
-					.filter((line) => line.startsWith('!'))
-					.slice(0, 3)
+			? failure.errors?.trim()
+				? failure.errors.trim().split('\n')
+				: latexErrors(failure.log)
 			: []
 	);
+
+	let copied = $state(false);
+	async function copyLog() {
+		try {
+			await navigator.clipboard.writeText(failure?.log ?? '');
+			copied = true;
+			setTimeout(() => (copied = false), 2000);
+		} catch {
+			toast({ text: 'Não deu para copiar. Selecione o texto e copie à mão.', tone: 'danger' });
+		}
+	}
 </script>
 
 <svelte:head><title>Currículo · Wok</title></svelte:head>
@@ -112,9 +123,14 @@
 			role="alert"
 		>
 			<p class="font-medium">O LaTeX não compilou.</p>
-			{#each errorLines as line (line)}<p class="mt-1 font-mono text-xs break-words">
+			{#if failure.explanation}
+				<p class="mt-1 text-[0.9375rem] leading-snug font-medium text-ink">{failure.explanation}</p>
+			{/if}
+			{#each errorLines as line (line)}
+				<p class="mt-1.5 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">
 					{line}
-				</p>{/each}
+				</p>
+			{/each}
 			<button
 				type="button"
 				class="mt-1 min-h-11 font-medium underline underline-offset-4"
@@ -186,8 +202,15 @@
 </div>
 
 <Sheet bind:open={logOpen} title="Log do LaTeX" tall>
-	<pre class="font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">{failure?.log ??
+	<pre
+		class="font-mono text-xs leading-relaxed break-words whitespace-pre-wrap select-text">{failure?.log ??
 			''}</pre>
+	{#snippet footer()}
+		<button type="button" class="btn btn-quiet w-full" onclick={copyLog}>
+			<Icon name={copied ? 'check' : 'doc'} size={20} />
+			{copied ? 'Copiado' : 'Copiar log'}
+		</button>
+	{/snippet}
 </Sheet>
 
 <style>

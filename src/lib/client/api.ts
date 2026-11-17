@@ -7,6 +7,7 @@ import type {
 	Job,
 	Preferences,
 	Profile,
+	ProfileDoc,
 	Resume,
 	SavedAnswer,
 	SearchRun,
@@ -154,6 +155,16 @@ export const api = {
 				languages: profile.languages.filter((item) => item.language.trim()),
 				certifications: profile.certifications.filter((item) => item.name.trim())
 			}),
+		// Perfil profissional (markdown). Caminhos provisórios até o Back-End fechar o contrato.
+		doc: {
+			get: () => call<ProfileDoc>('GET', '/api/profile/document'),
+			save: (markdown: string) => call<ProfileDoc>('PUT', '/api/profile/document', { markdown }),
+			/** Rascunho a partir do currículo: só vale depois de salvo. */
+			draft: () => call<{ markdown: string }>('POST', '/api/profile/document/draft', {}),
+			/** A resposta é incorporada ao documento; volta o markdown atualizado. */
+			answer: (questionId: string, answer: string) =>
+				call<ProfileDoc>('POST', '/api/profile/document/answer', { questionId, answer })
+		},
 		answers: () => call<SavedAnswer[]>('GET', '/api/profile/answers'),
 		deleteAnswer: (id: string) =>
 			call<SavedAnswer[]>('DELETE', `/api/profile/answers/${encodeURIComponent(id)}`)

@@ -16,7 +16,7 @@
 		path: string;
 		label: string;
 		icon: IconName;
-		also?: string;
+		also?: string[];
 	}[] = [
 		{ href: '/(app)', path: '/', label: 'Vagas', icon: 'cards' },
 		{ href: '/(app)/inscricoes', path: '/inscricoes', label: 'Inscrições', icon: 'send' },
@@ -25,14 +25,14 @@
 			path: '/curriculo',
 			label: 'Perfil',
 			icon: 'doc',
-			also: '/ajustes'
+			also: ['/ajustes', '/profissional']
 		}
 	];
 
 	function isActive(item: (typeof items)[number]) {
 		const path = page.url.pathname;
 		if (item.path === '/') return path === '/';
-		return path.startsWith(item.path) || (!!item.also && path.startsWith(item.also));
+		return path.startsWith(item.path) || !!item.also?.some((other) => path.startsWith(other));
 	}
 </script>
 

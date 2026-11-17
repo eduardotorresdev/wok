@@ -6,6 +6,7 @@ import type {
 	Job,
 	Preferences,
 	Profile,
+	ProfileDoc,
 	Resume,
 	SavedAnswer,
 	Step,
@@ -21,6 +22,7 @@ export const keys = {
 	resume: ['resume'] as const,
 	profile: ['profile'] as const,
 	answers: ['profile', 'answers'] as const,
+	profileDoc: ['profile', 'document'] as const,
 	browser: ['browser', 'state'] as const
 };
 
@@ -93,6 +95,52 @@ export const saveProfileMutation = (client: QueryClient) =>
 		},
 		onSuccess: (saved) => {
 			if (saved) client.setQueryData(keys.profile, saved);
+		}
+	});
+
+export const profileDocQuery = () =>
+	queryOptions({
+		queryKey: keys.profileDoc,
+		queryFn: api.profile.doc.get,
+		enabled: browser,
+		staleTime: 60_000,
+		// Em servidor que ainda não tem o documento, a aba simplesmente não aparece.
+		retry: false
+	});
+
+export const saveProfileDocMutation = (client: QueryClient) =>
+	mutationOptions({
+		mutationKey: ['profile', 'document', 'save'],
+		mutationFn: (markdown: string) => api.profile.doc.save(markdown),
+		onMutate: async (markdown) => {
+			await client.cancelQueries({ queryKey: keys.profileDoc, exact: true });
+			const previous = client.getQueryData<ProfileDoc>(keys.profileDoc);
+			client.setQueryData<ProfileDoc>(keys.profileDoc, (old) =>
+				old ? { ...old, markdown } : { markdown, updatedAt: null, questions: [] }
+			);
+			return { previous };
+		},
+		onError: (_error, _markdown, context) => {
+			client.setQueryData(keys.profileDoc, context?.previous);
+		},
+		onSuccess: (saved) => {
+			if (saved) client.setQueryData(keys.profileDoc, saved);
+		}
+	});
+
+export const draftProfileDocMutation = () =>
+	mutationOptions({
+		mutationKey: ['profile', 'document', 'draft'],
+		mutationFn: () => api.profile.doc.draft()
+	});
+
+export const answerProfileDocMutation = (client: QueryClient) =>
+	mutationOptions({
+		mutationKey: ['profile', 'document', 'answer'],
+		mutationFn: ({ questionId, answer }: { questionId: string; answer: string }) =>
+			api.profile.doc.answer(questionId, answer),
+		onSuccess: (saved) => {
+			if (saved) client.setQueryData(keys.profileDoc, saved);
 		}
 	});
 

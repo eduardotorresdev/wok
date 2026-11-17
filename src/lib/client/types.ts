@@ -136,6 +136,21 @@ export const emptyPreferences = (): Preferences => ({
 	updatedAt: null
 });
 
+/** Pergunta que o servidor sugere para completar o perfil profissional. */
+export interface ProfileQuestion {
+	id: string;
+	text: string;
+	/** Por que a resposta ajuda, quando o servidor disser. */
+	hint?: string | null;
+}
+
+/** O perfil profissional: um markdown só, a fonte de fatos do agente. */
+export interface ProfileDoc {
+	markdown: string;
+	updatedAt: string | null;
+	questions: ProfileQuestion[];
+}
+
 export interface SavedAnswer {
 	id: string;
 	question: string;

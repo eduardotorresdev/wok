@@ -256,6 +256,46 @@ function run(s: Store): SearchRun {
 
 let browserOpen = false;
 
+const DRAFT = `# Perfil profissional
+
+## Contato
+- Nome: Ana Souza
+- Cidade: São Paulo, SP
+- Email: ana@exemplo.com
+
+## Momento profissional
+Engenheira de software sênior, 8 anos de experiência, procurando posições de **plataforma** ou *staff* em empresas de produto.
+
+## Experiência
+### Nubank · Engenheira Sênior (2021–hoje)
+- Liderou a migração do serviço de limites para Kotlin
+- Reduziu o p99 de 480 ms para 120 ms
+
+## O que não afirmar
+- Não tenho experiência com Flink em produção
+- Inglês: avançado, não fluente
+
+## Voz e formato
+Texto direto, sem adjetivos. Currículo de uma página.
+`;
+let profileDoc = {
+	markdown: '',
+	updatedAt: null as string | null,
+	questions: [
+		{ id: 'q1', text: 'Qual foi o tamanho do time que você liderou na migração?', hint: null },
+		{
+			id: 'q2',
+			text: 'Você tem números de impacto do design system?',
+			hint: 'Números deixam o currículo mais forte.'
+		},
+		{
+			id: 'q3',
+			text: 'Há algum projeto sob confidencialidade que o agente não deve citar?',
+			hint: null
+		}
+	]
+};
+
 function forced() {
 	return new URLSearchParams(location.search).get('estado');
 }
@@ -309,6 +349,30 @@ export async function mock(method: string, path: string, body: unknown): Promise
 		s.apps = s.apps.map((a) => (a === entry ? { ...a, forceSubmit: true } : a));
 		save();
 		return applications().find((a) => a.id === entry.id);
+	}
+	if (route === 'GET /api/profile/document') return profileDoc;
+	if (route === 'PUT /api/profile/document') {
+		await wait(500);
+		profileDoc = {
+			...profileDoc,
+			markdown: String(input.markdown ?? ''),
+			updatedAt: new Date().toISOString()
+		};
+		return profileDoc;
+	}
+	if (route === 'POST /api/profile/document/draft') {
+		await wait(2500);
+		return { markdown: DRAFT };
+	}
+	if (route === 'POST /api/profile/document/answer') {
+		await wait(1200);
+		const question = profileDoc.questions.find((q) => q.id === input.questionId);
+		profileDoc = {
+			markdown: `${profileDoc.markdown.trimEnd()}\n\n## Complementos\n- ${question?.text ?? ''} ${String(input.answer)}\n`,
+			updatedAt: new Date().toISOString(),
+			questions: profileDoc.questions.filter((q) => q !== question)
+		};
+		return profileDoc;
 	}
 	if (route.startsWith('GET /api/browser') || route.startsWith('POST /api/browser')) {
 		if (route === 'POST /api/browser/open') browserOpen = true;

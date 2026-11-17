@@ -405,15 +405,72 @@ async function attachScreencast(session: Session, tab: Tab, page: Page) {
 		maxWidth: VIEWPORT.width * 2,
 		maxHeight: VIEWPORT.height * 2
 	});
+	await followNavigations(cdp, () => {
+		if (tab.cdp !== cdp) return;
+		const nav = ++tab.nav;
+		void publishState(session, tab);
+		// The screencast only sends a frame when the picture changes, and a viewer
+		// waits for a frame of the new page: one is made now, and one more once the
+		// page has had a moment to draw.
+		const send = async () => {
+			if (tab.cdp !== cdp || tab.nav !== nav || page.isClosed()) return;
+			const jpeg = (await captureJpeg(cdp)) ?? tab.lastFrame?.jpeg;
+			if (!jpeg || tab.cdp !== cdp || tab.nav !== nav) return;
+			tab.lastFrame = {
+				jpeg,
+				width: tab.lastFrame?.width ?? VIEWPORT.width,
+				height: tab.lastFrame?.height ?? VIEWPORT.height,
+				url: page.url(),
+				nav
+			};
+			emit(session.userId, tab.key, { type: 'frame', frame: tab.lastFrame });
+		};
+		void send();
+		setTimeout(() => void send(), 1000).unref();
+	}).catch((err) => console.error(`[browser] cannot follow navigations: ${firstLine(err)}`));
+}
+
+/**
+ * Calls `onNavigate` once for each page the tab goes to: a new document in the
+ * main frame, or a route change inside the page that changes the address.
+ * Frames inside the page and a repeated pushState to the same address do not count.
+ */
+export async function followNavigations(cdp: CDPSession, onNavigate: () => void) {
+	await cdp.send('Page.enable');
+	const { frameTree } = await cdp.send('Page.getFrameTree');
+	let mainId = frameTree.frame.id;
+	let address = frameTree.frame.url + (frameTree.frame.urlFragment ?? '');
+	cdp.on('Page.frameNavigated', ({ frame }) => {
+		if (frame.parentId) return;
+		mainId = frame.id;
+		address = frame.url + (frame.urlFragment ?? '');
+		onNavigate();
+	});
+	cdp.on('Page.navigatedWithinDocument', ({ frameId, url }) => {
+		if (frameId !== mainId || url === address) return;
+		address = url;
+		onNavigate();
+	});
+}
+
+/** What the page shows right now, as base64 JPEG; null when it cannot be taken in time. */
+export async function captureJpeg(cdp: CDPSession): Promise<string | null> {
+	let timer: ReturnType<typeof setTimeout>;
+	const late = new Promise<null>((resolve) => {
+		timer = setTimeout(() => resolve(null), 1500);
+	});
+	const shot = cdp
+		.send('Page.captureScreenshot', { format: 'jpeg', quality: 55, optimizeForSpeed: true })
+		.then((r) => r.data)
+		.catch(() => null);
+	return Promise.race([shot, late]).finally(() => clearTimeout(timer));
 }
 
 function watchPage(session: Session, tab: Tab, page: Page) {
 	page.setDefaultTimeout(15_000);
 	page.setDefaultNavigationTimeout(NAV_TIMEOUT_MS);
 	page.on('framenavigated', (frame) => {
-		if (frame !== page.mainFrame() || tab.page !== page) return;
-		tab.nav++;
-		void publishState(session, tab);
+		if (frame === page.mainFrame() && tab.page === page) void publishState(session, tab);
 	});
 	page.on('close', () => {
 		tab.stack = tab.stack.filter((p) => p !== page);

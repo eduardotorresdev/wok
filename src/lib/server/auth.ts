@@ -1,10 +1,11 @@
 import { betterAuth } from 'better-auth';
 import { getMigrations } from 'better-auth/db/migration';
 import { magicLink } from 'better-auth/plugins/magic-link';
+import { APIError } from 'better-auth/api';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
 import { getRequestEvent } from '$app/server';
 import { sqlite } from './db';
-import { sendMagicLinkEmail } from './email';
+import { EmailUnavailable, sendMagicLinkEmail } from './email';
 import { config } from './env';
 
 function createAuth() {
@@ -28,7 +29,16 @@ function createAuth() {
 					const link = new URL('/api/login-link', config.baseUrl);
 					link.searchParams.set('token', token);
 					link.searchParams.set('callbackURL', callback);
-					await sendMagicLinkEmail(email, link.toString());
+					try {
+						await sendMagicLinkEmail(email, link.toString());
+					} catch (err) {
+						if (!(err instanceof EmailUnavailable)) throw err;
+						// Every attempt failed to reach the email service: say so, plainly.
+						throw new APIError('SERVICE_UNAVAILABLE', {
+							code: 'EMAIL_UNAVAILABLE',
+							message: 'Não consegui enviar o email agora. Tente de novo em instantes.'
+						});
+					}
 				}
 			}),
 			sveltekitCookies(getRequestEvent)

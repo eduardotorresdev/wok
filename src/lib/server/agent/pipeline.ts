@@ -7,7 +7,8 @@ import {
 	setStatus,
 	update
 } from '../applications/store.ts';
-import { enqueue, setRunner } from '../applications/queue.ts';
+import { enqueue, RetryLater, setRunner } from '../applications/queue.ts';
+import { isTransient } from '../retry.ts';
 import {
 	acquireForAgent,
 	releaseFromAgent,
@@ -140,6 +141,7 @@ async function runApplication(applicationId: string) {
 			update(applicationId, { tailoredLatex, tailoredPdfPath: pdfPath });
 			if (result.note) logStep(applicationId, 'tailor_note', result.note);
 		} catch (err) {
+			if (isTransient(err)) throw new RetryLater(describeLlmError(err));
 			// Nothing is sent without a one-page résumé; the person can adjust the base and resume.
 			return void setStatus(
 				applicationId,
@@ -211,6 +213,12 @@ async function runApplication(applicationId: string) {
 			}
 		});
 	} catch (err) {
+		if (isTransient(err)) {
+			// The connection dropped mid-form: close the tab and start over later,
+			// rather than calling the application failed.
+			await releaseFromAgent(userId, applicationId, 'close');
+			throw new RetryLater(describeLlmError(err));
+		}
 		outcome = { type: 'failed', message: `Erro durante a candidatura: ${describeLlmError(err)}` };
 	}
 

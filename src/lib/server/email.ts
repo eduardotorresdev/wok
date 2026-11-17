@@ -1,5 +1,56 @@
 import { Resend } from 'resend';
 import { config } from './env';
+import { withRetry, withTimeout } from './retry.ts';
+
+/** The email service could not be reached after every attempt (never a refused request). */
+export class EmailUnavailable extends Error {}
+
+class SendFailed extends Error {
+	constructor(
+		message: string,
+		readonly statusCode: number | null
+	) {
+		super(message);
+	}
+}
+
+const SEND_TIMEOUT_MS = 10_000;
+
+type Message = { from: string; to: string; subject: string; text: string; html: string };
+
+/**
+ * Sends one email, trying again when the service could not be reached or
+ * answered 5xx. A 4xx (bad address, bad key) is final at the first answer.
+ */
+async function deliver(message: Message) {
+	const resend = new Resend(config.resendApiKey);
+	try {
+		await withRetry(
+			'email',
+			async () => {
+				const { error } = await withTimeout(resend.emails.send(message), SEND_TIMEOUT_MS, 'email');
+				// The SDK reports a failed fetch as an error without a status code.
+				// A refusal whose body carries no status is still a refusal: only the SDK's
+				// own "could not fetch" error counts as the network.
+				if (error) {
+					const unreachable = error.statusCode == null && error.name === 'application_error';
+					throw new SendFailed(error.message, unreachable ? null : (error.statusCode ?? 400));
+				}
+			},
+			{
+				retryable: (err) =>
+					err instanceof SendFailed ? err.statusCode === null || err.statusCode >= 500 : true
+			}
+		);
+	} catch (err) {
+		const reason = err instanceof Error ? err.message : String(err);
+		console.error('[email] send failed', reason);
+		if (err instanceof SendFailed && err.statusCode !== null && err.statusCode < 500) {
+			throw new Error(`Falha ao enviar email: ${reason}`, { cause: err });
+		}
+		throw new EmailUnavailable(`Falha ao enviar email: ${reason}`, { cause: err });
+	}
+}
 
 export async function sendMagicLinkEmail(email: string, url: string) {
 	if (!config.resendApiKey) {
@@ -7,8 +58,7 @@ export async function sendMagicLinkEmail(email: string, url: string) {
 		console.log(`[auth] magic link for ${email}: ${url}`);
 		return;
 	}
-	const resend = new Resend(config.resendApiKey);
-	const { error } = await resend.emails.send({
+	await deliver({
 		from: config.emailFrom,
 		to: email,
 		subject: 'Seu link de acesso ao WOK',
@@ -20,10 +70,6 @@ export async function sendMagicLinkEmail(email: string, url: string) {
 <p style="font-size:13px;color:#5f5868">Se você não pediu este acesso, ignore este email.</p>
 </div>`
 	});
-	if (error) {
-		console.error('[auth] resend error', error);
-		throw new Error(`Falha ao enviar email: ${error.message}`);
-	}
 }
 
 const escapeHtml = (text: string) =>
@@ -39,8 +85,7 @@ export async function sendNeedsUserEmail(
 		console.log(`[notify] ${email}: ${subject} — ${info.url}`);
 		return;
 	}
-	const resend = new Resend(config.resendApiKey);
-	const { error } = await resend.emails.send({
+	await deliver({
 		from: config.emailFrom,
 		to: email,
 		subject,
@@ -53,5 +98,4 @@ export async function sendNeedsUserEmail(
 <p style="font-size:13px;color:#5f5868">Para não receber estes avisos, desligue-os no seu perfil no WOK.</p>
 </div>`
 	});
-	if (error) throw new Error(`Falha ao enviar email: ${error.message}`);
 }

@@ -13,7 +13,16 @@ export function hasLlm() {
 }
 
 export function anthropic() {
-	if (!client) client = new Anthropic({ apiKey: config.anthropicApiKey, maxRetries: 3 });
+	if (!client) {
+		client = new Anthropic({
+			apiKey: config.anthropicApiKey,
+			// The SDK retries connection errors, timeouts, 408, 409, 429 and 5xx with backoff.
+			maxRetries: 4,
+			// Per attempt. The longest call (rewriting a résumé) takes a couple of minutes;
+			// the SDK's own default of ten would hold an application on a dead connection.
+			timeout: 240_000
+		});
+	}
 	return client;
 }
 

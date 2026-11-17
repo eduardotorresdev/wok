@@ -1,5 +1,6 @@
 import { ApifyClient } from 'apify-client';
 import { config } from '../env.ts';
+import { withRetry } from '../retry.ts';
 import type { CollectedJob, SearchQuery } from './types.ts';
 
 // Both actors charge per dataset item, so `limit` is also the cost ceiling.
@@ -12,15 +13,24 @@ export function hasApify() {
 }
 
 function client() {
-	return new ApifyClient({ token: config.apifyToken });
+	// Attempts are ours (see retry.ts); the client's own would multiply them.
+	return new ApifyClient({ token: config.apifyToken, maxRetries: 0, timeoutSecs: 60 });
 }
 
-async function runActor(actor: string, input: Record<string, unknown>, limit: number) {
-	const run = await client().actor(actor).call(input, { waitSecs: WAIT_SECS, log: null });
+export async function runActor(actor: string, input: Record<string, unknown>, limit: number) {
+	// Three separate steps, each with its own attempts: a network failure while
+	// waiting or reading must not start (and pay for) the actor again.
+	const api = client();
+	const started = await withRetry(`apify start ${actor}`, () => api.actor(actor).start(input));
+	const run = await withRetry(`apify wait ${actor}`, () =>
+		api.run(started.id).waitForFinish({ waitSecs: WAIT_SECS })
+	);
 	if (run.status !== 'SUCCEEDED') {
 		throw new Error(`${actor} terminou com status ${run.status}`);
 	}
-	const { items } = await client().dataset(run.defaultDatasetId).listItems({ limit });
+	const { items } = await withRetry(`apify dataset ${actor}`, () =>
+		api.dataset(run.defaultDatasetId).listItems({ limit })
+	);
 	return items as Record<string, unknown>[];
 }
 

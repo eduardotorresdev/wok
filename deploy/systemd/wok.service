@@ -1,0 +1,16 @@
+# Unit de usuário (a máquina já usa esse padrão para o agentboard; linger está ligado).
+#   cp deploy/systemd/wok*.{service,timer} ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now wok.service wok-backup.timer
+[Unit]
+Description=WOK (SvelteKit adapter-node)
+After=network-online.target
+
+[Service]
+ExecStart=%h/wok/bin/supervise.sh
+Restart=always
+RestartSec=2
+KillMode=control-group
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target

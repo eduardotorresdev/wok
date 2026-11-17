@@ -1,0 +1,6 @@
+[Unit]
+Description=Backup do DATA_DIR do WOK
+
+[Service]
+Type=oneshot
+ExecStart=%h/wok/bin/backup.sh

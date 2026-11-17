@@ -8,13 +8,15 @@
 <script lang="ts">
 	import { browser } from '$app/env';
 	import { ApiError, api } from '#lib/client/api.ts';
-	import type { BrowserFrame, BrowserInput, BrowserState } from '#lib/client/types.ts';
+	import { onMount } from 'svelte';
+	import type { BrowserFrame, BrowserInput, BrowserState, Provider } from '#lib/client/types.ts';
 	import Icon from './Icon.svelte';
 	import SourceIcon from './SourceIcon.svelte';
 
 	let {
 		mode = 'watch',
 		shortcuts = false,
+		start = null,
 		takeover = false,
 		maxHeight = 0.56,
 		fit = false,
@@ -25,6 +27,8 @@
 		mode?: 'watch' | 'control';
 		/** Atalhos para abrir LinkedIn, Glassdoor ou uma URL. */
 		shortcuts?: boolean;
+		/** Abre o login deste site assim que o visor aparece. */
+		start?: Provider | null;
 		/** Assume o controle da página que o agente deixou aberta. */
 		takeover?: boolean;
 		/** Altura máxima da tela remota, como fração da altura da janela. */
@@ -212,6 +216,16 @@
 			});
 	}
 
+	const LOGIN: Record<Provider, string> = {
+		linkedin: 'https://www.linkedin.com/login',
+		glassdoor: 'https://www.glassdoor.com.br/profile/login_input.htm'
+	};
+
+	// Só na montagem: quem chegou por "Conectar LinkedIn" não precisa escolher de novo.
+	onMount(() => {
+		if (start) void open(LOGIN[start]);
+	});
+
 	async function open(target: string) {
 		const clean = target.trim();
 		if (!clean) return;
@@ -341,30 +355,27 @@
 <div class="w-full" bind:clientWidth={boxWidth}>
 	{#if shortcuts && mode === 'control'}
 		<div class="mb-2 flex flex-wrap gap-2">
-			<button
-				type="button"
-				class="chip"
-				disabled={opening}
-				onclick={() => open('https://www.linkedin.com/login')}
-			>
+			<button type="button" class="chip" disabled={opening} onclick={() => open(LOGIN.linkedin)}>
 				<SourceIcon source="linkedin" />
 				LinkedIn
 				{#if remote?.accounts.linkedin}<span class="text-primary"
 						><Icon name="check" size={16} stroke={2.4} /></span
 					>{/if}
 			</button>
-			<button
-				type="button"
-				class="chip"
-				disabled={opening}
-				onclick={() => open('https://www.glassdoor.com.br/profile/login_input.htm')}
-			>
-				<SourceIcon source="glassdoor" />
-				Glassdoor
-				{#if remote?.accounts.glassdoor}<span class="text-primary"
-						><Icon name="check" size={16} stroke={2.4} /></span
-					>{/if}
-			</button>
+			{#if remote?.glassdoorManual}
+				<p class="chip text-ink-soft" style="font-weight: 400">
+					<SourceIcon source="glassdoor" />
+					Glassdoor: você se inscreve no site
+				</p>
+			{:else}
+				<button type="button" class="chip" disabled={opening} onclick={() => open(LOGIN.glassdoor)}>
+					<SourceIcon source="glassdoor" />
+					Glassdoor
+					{#if remote?.accounts.glassdoor}<span class="text-primary"
+							><Icon name="check" size={16} stroke={2.4} /></span
+						>{/if}
+				</button>
+			{/if}
 			<button
 				type="button"
 				class="chip"

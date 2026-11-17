@@ -62,6 +62,9 @@ export const JOBS: Job[] = [
 		location: 'Florianópolis, SC',
 		source: 'linkedin',
 		url: 'https://www.linkedin.com/jobs/view/3',
+		applyVia: 'linkedin',
+		canApply: false,
+		blockedBy: 'linkedin',
 		salary: null,
 		postedAt: ago(2),
 		summary:

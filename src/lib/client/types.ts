@@ -16,7 +16,13 @@ export interface Job {
 	matchReasons: string[];
 	/** Por onde a inscrição será feita. Ausente em servidores antigos. */
 	applyVia?: 'company' | 'linkedin' | 'glassdoor' | null;
+	/** Falso quando falta conectar a conta do provedor da vaga. Ausente em servidores antigos. */
+	canApply?: boolean;
+	blockedBy?: Provider | null;
 }
+
+/** Sites em que a pessoa conecta a própria conta. */
+export type Provider = 'linkedin' | 'glassdoor';
 
 export interface SearchRun {
 	id: string;
@@ -163,6 +169,8 @@ export interface BrowserState {
 	url: string | null;
 	title: string | null;
 	viewport: { width: number; height: number };
+	/** O Glassdoor barra o nosso browser: lá a pessoa se inscreve por conta própria. */
+	glassdoorManual?: boolean;
 	accounts: { linkedin: boolean; glassdoor: boolean };
 }
 

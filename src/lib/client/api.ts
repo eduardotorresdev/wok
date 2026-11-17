@@ -17,7 +17,9 @@ export class ApiError extends Error {
 	constructor(
 		public status: number,
 		public code: string,
-		message: string
+		message: string,
+		/** O corpo de `error` como veio do servidor (ex.: `provider`). */
+		public details: Record<string, unknown> = {}
 	) {
 		super(message);
 	}
@@ -88,7 +90,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 	throw new ApiError(
 		res.status,
 		known?.code ?? 'http_error',
-		known?.message ?? 'Algo deu errado. Tente de novo.'
+		known?.message ?? 'Algo deu errado. Tente de novo.',
+		(known as Record<string, unknown> | undefined) ?? {}
 	);
 }
 

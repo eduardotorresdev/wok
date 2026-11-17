@@ -5,14 +5,17 @@
 	import { ApiError } from '#lib/client/api.ts';
 	import {
 		applicationsQuery,
+		browserStateQuery,
 		feedQuery,
 		keys,
 		searchMutation,
 		searchRunQuery,
 		swipeMutation
 	} from '#lib/client/queries.ts';
-	import type { Job, SwipeDirection } from '#lib/client/types.ts';
+	import { blockedProvider, PROVIDER_NAME } from '#lib/client/format.ts';
+	import type { Job, Provider, SwipeDirection } from '#lib/client/types.ts';
 	import Brush from '#lib/components/Brush.svelte';
+	import ConnectAccounts from '#lib/components/ConnectAccounts.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Sheet from '#lib/components/Sheet.svelte';
 	import SwipeDeck from '#lib/components/SwipeDeck.svelte';
@@ -50,6 +53,7 @@
 	});
 
 	let deck = $state<ReturnType<typeof SwipeDeck>>();
+	const topBlocked = $derived(jobs[0] ? blockedProvider(jobs[0]) : null);
 
 	// Aviso único antes da primeira inscrição.
 	const WARNED = 'wok:aviso-inscricao';
@@ -64,8 +68,43 @@
 		}
 	}
 
+	// Só dá para aceitar uma vaga com a conta do provedor dela conectada.
+	const accounts = createQuery(() => browserStateQuery());
+	const noAccount = $derived(
+		!!accounts.data && !accounts.data.accounts.linkedin && !accounts.data.accounts.glassdoor
+	);
+	let connectOpen = $state(false);
+	let connectProvider = $state<Provider | null>(null);
+
+	function connect(provider: Provider) {
+		connectProvider = provider;
+		connectOpen = true;
+	}
+
+	function connected(provider: Provider) {
+		// Não inscreve sozinho: a pessoa arrasta de novo.
+		toast({ text: `${PROVIDER_NAME[provider]} conectado. Agora é só arrastar a vaga.` });
+	}
+
+	// Ao fechar a folha, o feed é relido: o servidor diz de novo quais vagas dá para aceitar.
+	let connectWasOpen = false;
+	$effect(() => {
+		if (connectWasOpen && !connectOpen) {
+			client.invalidateQueries({ queryKey: keys.feed });
+			client.invalidateQueries({ queryKey: keys.browser });
+		}
+		connectWasOpen = connectOpen;
+	});
+
 	function allow(job: Job, direction: SwipeDirection) {
-		if (direction !== 'apply' || warned()) return true;
+		if (direction !== 'apply') return true;
+		const blocked = blockedProvider(job);
+		if (blocked) {
+			// O card volta para a pilha e a folha abre já no site que falta.
+			connect(blocked);
+			return false;
+		}
+		if (warned()) return true;
 		warnJob = job;
 		warnOpen = true;
 		return false;
@@ -92,7 +131,17 @@
 						toast({ text: 'Na fila do agente.', href: '/(app)/inscricoes', action: 'Acompanhar' });
 					}
 				},
-				onError: () => {
+				onError: (error) => {
+					// A sessão do site pode ter expirado depois de o feed ser montado.
+					if (error instanceof ApiError && error.code === 'account_not_connected') {
+						const provider = error.details.provider;
+						connect(
+							provider === 'linkedin' || provider === 'glassdoor'
+								? provider
+								: (blockedProvider({ ...job, canApply: false }) ?? 'linkedin')
+						);
+						return;
+					}
 					toast({ text: 'Não deu para registrar. A vaga voltou para a pilha.', tone: 'danger' });
 				}
 			}
@@ -140,6 +189,18 @@
 			<Icon name="sliders" />
 		</a>
 	</header>
+
+	{#if noAccount}
+		<button
+			type="button"
+			class="mx-4 mb-1 flex min-h-11 shrink-0 items-center gap-2 rounded-sm bg-band px-3 text-left text-sm font-medium"
+			onclick={() => connect('linkedin')}
+		>
+			<Icon name="alert" size={18} />
+			<span class="flex-1">Conecte o LinkedIn para começar a se inscrever</span>
+			<Icon name="chevron" size={16} />
+		</button>
+	{/if}
 
 	{#if waiting.length > 0}
 		<a
@@ -231,14 +292,24 @@
 					<Icon name="x" size={20} />
 					Deixar pra lá
 				</button>
-				<button type="button" class="btn min-h-13" onclick={() => deck?.swipe('apply')}>
-					Inscrever
-					<Icon name="send" size={20} />
-				</button>
+				{#if topBlocked}
+					<button type="button" class="btn min-h-13" onclick={() => connect(topBlocked)}>
+						Conectar {PROVIDER_NAME[topBlocked]}
+					</button>
+				{:else}
+					<button type="button" class="btn min-h-13" onclick={() => deck?.swipe('apply')}>
+						Inscrever
+						<Icon name="send" size={20} />
+					</button>
+				{/if}
 			</div>
 		{/if}
 	</div>
 </div>
+
+{#if connectOpen || connectProvider}
+	<ConnectAccounts bind:open={connectOpen} provider={connectProvider} onconnected={connected} />
+{/if}
 
 <Sheet
 	bind:open={warnOpen}

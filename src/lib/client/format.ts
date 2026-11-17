@@ -1,4 +1,4 @@
-import type { ApplicationStatus, Job } from './types.ts';
+import type { ApplicationStatus, Job, Provider } from './types.ts';
 
 const rtf = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' });
 
@@ -45,8 +45,22 @@ export function clockTime(iso: string) {
 export function applyViaLabel(job: Pick<Job, 'applyVia'>) {
 	if (job.applyVia === 'company') return 'Inscrição pelo site da empresa';
 	if (job.applyVia === 'linkedin') return 'Inscrição pelo LinkedIn';
-	if (job.applyVia === 'glassdoor') return 'Inscrição pelo Glassdoor';
+	// No Glassdoor o agente prepara e a pessoa envia: isso precisa estar dito antes do gesto.
+	if (job.applyVia === 'glassdoor') return 'Você envia pelo Glassdoor';
 	return null;
+}
+
+export const PROVIDER_NAME: Record<Provider, string> = {
+	linkedin: 'LinkedIn',
+	glassdoor: 'Glassdoor'
+};
+
+/** A conta que falta conectar para aceitar esta vaga, ou null se ela pode ser aceita. */
+export function blockedProvider(
+	job: Pick<Job, 'canApply' | 'blockedBy' | 'source'>
+): Provider | null {
+	if (job.canApply !== false) return null;
+	return job.blockedBy ?? (job.source === 'glassdoor' ? 'glassdoor' : 'linkedin');
 }
 
 /**

@@ -5,7 +5,14 @@
 -->
 <script lang="ts">
 	import type { Job } from '#lib/client/types.ts';
-	import { applyViaLabel, relativeTime, scorePercent, sourceLabel } from '#lib/client/format.ts';
+	import {
+		applyViaLabel,
+		blockedProvider,
+		PROVIDER_NAME,
+		relativeTime,
+		scorePercent,
+		sourceLabel
+	} from '#lib/client/format.ts';
 	import CompanyAvatar from './CompanyAvatar.svelte';
 	import Icon from './Icon.svelte';
 	import ScoreMark from './ScoreMark.svelte';
@@ -27,6 +34,7 @@
 
 	const posted = $derived(relativeTime(job.postedAt));
 	const via = $derived(applyViaLabel(job));
+	const blocked = $derived(blockedProvider(job));
 	const hasScore = $derived(scorePercent(job.matchScore) !== null);
 </script>
 
@@ -47,6 +55,16 @@
 			stroke-linejoin="round"
 		/>
 	</svg>
+{/snippet}
+
+{#snippet connect()}
+	{#if blocked}
+		<p
+			class="mt-1 flex items-center gap-1.5 text-[0.8125rem] leading-snug font-medium text-primary-deep"
+		>
+			<Icon name="alert" size={14} />Conecte o {PROVIDER_NAME[blocked]} para se inscrever
+		</p>
+	{/if}
 {/snippet}
 
 {#snippet source()}
@@ -86,9 +104,10 @@
 					>{/if}
 			</p>
 
-			{#if via}
+			{#if via && !blocked}
 				<p class="t-caption mt-1 flex items-center gap-1.5"><Icon name="send" size={14} />{via}</p>
 			{/if}
+			{@render connect()}
 
 			{#if job.summary}
 				<p class="summary mt-3 text-[0.9375rem] leading-normal">{job.summary}</p>
@@ -141,11 +160,12 @@
 						>{/if}
 				</p>
 				<div class="mt-2">{@render source()}</div>
-				{#if via}
+				{#if via && !blocked}
 					<p class="t-caption mt-1 flex items-center gap-1.5">
 						<Icon name="send" size={14} />{via}
 					</p>
 				{/if}
+				{@render connect()}
 
 				{#if hasScore}
 					<section class="mt-5 flex items-center gap-3.5 rounded-sm bg-band p-3.5">

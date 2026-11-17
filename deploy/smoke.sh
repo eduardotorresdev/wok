@@ -8,6 +8,7 @@ APP_ROOT="${WOK_ROOT:-$HOME/wok}"
 ENV_FILE="$APP_ROOT/shared/.env"
 ORIGIN="$(grep -E '^ORIGIN=' "$ENV_FILE" | cut -d= -f2)"
 PORT="$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2)"
+DATA_DIR="$(grep -E '^DATA_DIR=' "$ENV_FILE" | cut -d= -f2)"
 BASE="${1:-$ORIGIN}"
 LOCAL="http://127.0.0.1:$PORT"
 EMAIL="${SMOKE_EMAIL:-delivered@resend.dev}"
@@ -65,6 +66,43 @@ tectonic_compiles() {
 	local rc=$?; rm -rf "$d"; return $rc
 }
 
+# Segurança: o LaTeX enviado por um usuário não pode ler arquivos do servidor. Entra como a
+# conta do smoke ($EMAIL, que acabou de pedir um magic link) e manda compilar um .tex que
+# faz \input de /etc/hostname e de um arquivo-canário criado ao lado do .env. Falha se o
+# hostname ou o canário aparecerem no texto do PDF ou na resposta, ou se o log do TeX
+# mostrar que abriu algum dos dois. Precisa do domínio público (cookie de sessão é Secure).
+latex_cannot_read_host_files() {
+	local jar body pdf tok host canary cfile code rc=0 f
+	jar="$(mktemp)"; body="$(mktemp)"; pdf="$(mktemp)"; host="$(hostname)"
+	canary="WOKCANARY$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
+	cfile="$APP_ROOT/shared/smoke-canary.txt"
+	( umask 077; echo "$canary" > "$cfile" )
+	tok="$(cd "$APP_ROOT/current" && DB="$DATA_DIR/wok.db" EMAIL="$EMAIL" node -e "
+		const db = new (require('better-sqlite3'))(process.env.DB, { readonly: true });
+		const r = db.prepare(\"select identifier from verification where identifier like 'magic-link:%' and value like '%' || ? || '%' order by rowid desc limit 1\").get(process.env.EMAIL);
+		if (!r) process.exit(1);
+		console.log(r.identifier.split(':')[1]);
+	")" || { echo "sem token de login para $EMAIL"; rm -f "$jar" "$body" "$pdf" "$cfile"; return 1; }
+	curl -s -o /dev/null -m 30 -c "$jar" "$BASE/api/auth/magic-link/verify?token=$tok&callbackURL=%2F"
+	for f in /etc/hostname "$cfile"; do
+		code="$(curl -s -o "$body" -m 200 -w '%{http_code}' -b "$jar" -X POST "$BASE/api/resume/compile" \
+			-H 'Content-Type: application/json' -H "Origin: $ORIGIN" \
+			-d "{\"latex\":\"\\\\documentclass{article}\\\\begin{document}smoke-leak-test \\\\input{$f} fim\\\\end{document}\"}")"
+		if [ "$code" != "200" ] || ! grep -q '"ok"' "$body"; then
+			echo "inconclusivo ($f): HTTP $code: $(head -c 200 "$body")"; rc=1; continue
+		fi
+		: > "$pdf"
+		curl -s -o "$pdf" -m 60 -b "$jar" "$BASE/api/resume/pdf" || true
+		if grep -qF -e "$host" -e "$canary" "$body" ||
+			pdftotext "$pdf" - 2>/dev/null | grep -qF -e "$host" -e "$canary"; then
+			echo "VAZOU: conteúdo de $f voltou no PDF ou na resposta da compilação"; rc=1
+		elif grep -qF "($f" "$body"; then
+			echo "VAZOU: o log do TeX mostra que $f foi aberto"; rc=1
+		fi
+	done
+	rm -f "$jar" "$body" "$pdf" "$cfile"; return $rc
+}
+
 pdflatex_compiles() { # mínimo com microtype + DisableLigatures (só existe em pdfTeX)
 	local d; d="$(mktemp -d)"
 	printf '%s\n' '\documentclass{article}' '\usepackage[T1]{fontenc}' '\usepackage[utf8]{inputenc}' \
@@ -103,6 +141,8 @@ check "HTTPS $BASE/api/auth/ok 200"               http_is "$BASE/api/auth/ok" 20
 check "HTTPS /api/jobs/feed sem sessão -> 401 JSON"    unauthorized_json "$BASE/api/jobs/feed"
 check "HTTPS /api/applications sem sessão -> 401 JSON" unauthorized_json "$BASE/api/applications"
 check "HTTPS /api/browser/state sem sessão -> 401 JSON" unauthorized_json "$BASE/api/browser/state"
+check "LaTeX de usuário não lê arquivos do servidor" latex_cannot_read_host_files
+check "bwrap disponível para o usuário do serviço" bwrap --unshare-all --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind /lib64 /lib64 /bin/true
 check "Chromium headless abre no servidor"       chromium_opens
 check "tectonic compila um .tex"                 tectonic_compiles
 check "pdflatex --version"                        pdflatex --version

@@ -186,6 +186,10 @@ export interface BrowserState {
 	url: string | null;
 	title: string | null;
 	viewport: { width: number; height: number };
+	/** A página ainda está abrindo em segundo plano; toques só valem depois. */
+	loading?: boolean;
+	/** A navegação falhou: frase pronta para mostrar. */
+	loadError?: string | null;
 	/** O Glassdoor barra o nosso browser: lá a pessoa se inscreve por conta própria. */
 	glassdoorManual?: boolean;
 	accounts: { linkedin: boolean; glassdoor: boolean };

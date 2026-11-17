@@ -120,8 +120,12 @@
 								<span class="mt-1.5 block text-sm leading-snug">
 									{app.pendingQuestion ?? app.lastMessage ?? 'Abra para ver o que falta.'}
 								</span>
-							{:else if app.lastMessage && app.status !== 'submitted' && app.status !== 'queued'}
-								<span class="mt-1.5 line-clamp-1 block text-sm leading-snug text-ink-soft">
+							{:else if app.lastMessage && app.status !== 'submitted'}
+								<!-- Na fila a mensagem explica a espera (nova tentativa em 30 s): vai inteira. -->
+								<span
+									class="mt-1.5 block text-sm leading-snug text-ink-soft"
+									class:line-clamp-1={app.status !== 'queued'}
+								>
 									{app.lastMessage}
 								</span>
 							{/if}

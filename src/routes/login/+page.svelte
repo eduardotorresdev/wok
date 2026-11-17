@@ -33,10 +33,16 @@
 				errorCallbackURL: next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`
 			});
 			if (result.error) {
-				error =
-					result.error.status === 429
-						? 'Muitas tentativas. Espere um minuto e tente de novo.'
-						: 'Não deu para enviar o link. Confira o email e tente de novo.';
+				// 503: o serviço de email não respondeu; a frase vem pronta do servidor e
+				// o reenvio fica livre (sem contagem).
+				if (result.error.status === 503) {
+					error = result.error.message || 'Não consegui enviar o email agora. Tente de novo.';
+					cooldown = 0;
+				} else
+					error =
+						result.error.status === 429
+							? 'Muitas tentativas. Espere um minuto e tente de novo.'
+							: 'Não deu para enviar o link. Confira o email e tente de novo.';
 				return;
 			}
 			sentTo = address;

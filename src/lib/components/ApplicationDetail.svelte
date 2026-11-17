@@ -110,6 +110,16 @@
 	);
 	const needsBrowser = $derived(waiting && !needsAnswer && !needsResume);
 
+	// A execução caiu depois de um passo que pode ter enviado a candidatura: nada é
+	// repetido sozinho; a pessoa confere na página e diz se foi ou não.
+	const maybeSent = $derived.by(() => {
+		if (!needsBrowser || app?.needsKind !== 'browser') return false;
+		const start = all.findLastIndex(
+			(step) => step.kind === 'control' && step.data?.controller === 'agent'
+		);
+		return all.slice(start + 1).some((step) => step.kind === 'submit_attempt');
+	});
+
 	// Retomada automática: a verificação sumiu da tela e o agente seguiu sozinho.
 	let resumedAlone = $state(false);
 	let before: { id: string; waiting: boolean } | null = null;
@@ -284,7 +294,9 @@
 			<section>
 				<p class="line-clamp-3 rounded-sm bg-primary-tint px-3 py-2 text-sm leading-snug">
 					{app.lastMessage ?? 'O site pediu login ou uma verificação.'}
-					<span class="text-ink-soft">Resolva abaixo e toque em "Continuar inscrição".</span>
+					{#if !maybeSent}
+						<span class="text-ink-soft">Resolva abaixo e toque em "Continuar inscrição".</span>
+					{/if}
 				</p>
 				<div class="mt-2">
 					<BrowserView
@@ -297,7 +309,9 @@
 				</div>
 				<!-- Saída sem o visor: a pessoa se inscreve no site e avisa aqui. -->
 				<div class="mt-5 border-t border-line pt-4" bind:this={offsite}>
-					<h3 class="t-title">Prefere fazer pelo site?</h3>
+					<h3 class="t-title">
+						{maybeSent ? 'Prefere conferir pelo site?' : 'Prefere fazer pelo site?'}
+					</h3>
 					<p class="mt-1 text-sm leading-snug text-ink-soft">
 						Abra a vaga, envie o currículo adaptado e marque aqui quando terminar.
 					</p>
@@ -424,7 +438,11 @@
 							<span class="w-10 shrink-0 text-ink-soft tabular-nums"
 								>{clockTime(step.createdAt)}</span
 							>
-							<span class={index === 0 ? '' : 'text-ink-soft'}>{step.message}</span>
+							{#if step.kind === 'submit_attempt'}
+								<span class="rounded-sm bg-primary-tint px-1.5 font-medium">{step.message}</span>
+							{:else}
+								<span class={index === 0 ? '' : 'text-ink-soft'}>{step.message}</span>
+							{/if}
 						</li>
 					{/each}
 				</ol>
@@ -452,6 +470,25 @@
 					<Icon name="refresh" size={20} />
 					Tentar de novo
 				</button>
+			{:else if maybeSent}
+				<div class="flex gap-2">
+					<button
+						type="button"
+						class="btn btn-quiet min-w-0 flex-1 px-3"
+						disabled={resume.isPending || markSubmitted.isPending}
+						onclick={carryOn}
+					>
+						Não foi, tentar de novo
+					</button>
+					<button
+						type="button"
+						class="btn shrink-0 px-4"
+						disabled={resume.isPending || markSubmitted.isPending}
+						onclick={markDone}
+					>
+						Já foi enviada
+					</button>
+				</div>
 			{:else if needsBrowser}
 				<div class="flex gap-2">
 					<button

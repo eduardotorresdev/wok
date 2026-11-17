@@ -60,7 +60,13 @@
 	let url = $state('');
 	let marks = $state<{ id: number; x: number; y: number }[]>([]);
 
-	const canControl = $derived(mode === 'control' && remote?.controller === 'user');
+	// O servidor responde na hora e a página abre em segundo plano: até `loading` cair,
+	// a tela mostra o aviso de abertura e não aceita toque nem teclado.
+	const loading = $derived(opening || !!remote?.loading);
+	const loadError = $derived(loading ? null : (remote?.loadError ?? null));
+	const canControl = $derived(
+		mode === 'control' && remote?.controller === 'user' && !loading && !loadError
+	);
 	const ratio = $derived.by(() => {
 		const size = remote?.viewport ?? frame;
 		return size && size.width > 0 ? size.height / size.width : 2.04;
@@ -189,12 +195,13 @@
 	// estar partindo a frio, então a espera é de 20 s.
 	$effect(() => {
 		void attempt;
-		if (frame || opening || trouble === 'failed' || !(takeover || remote?.open)) return;
+		if (frame || opening || loadError || trouble === 'failed' || !(takeover || remote?.open))
+			return;
 		const timer = setTimeout(
 			() => {
 				if (!frame && !taking && !opening) trouble = 'failed';
 			},
-			applicationId ? 8000 : 20000
+			applicationId && !remote?.loading ? 8000 : 25000
 		);
 		return () => clearTimeout(timer);
 	});
@@ -204,7 +211,7 @@
 		notice = null;
 		attempt += 1;
 		if (takeover && mode === 'control') void take();
-		else if (lastUrl) void open(lastUrl);
+		else if (lastUrl ?? remote?.url) void open((lastUrl ?? remote?.url) as string);
 	}
 
 	// Os comandos saem em fila, na ordem em que o usuário os fez.
@@ -214,6 +221,8 @@
 			.then(() => api.browser.input(input, applicationId))
 			.then(() => (notice = null))
 			.catch((error) => {
+				// A página ainda estava abrindo: o toque é só ignorado.
+				if (error instanceof ApiError && error.code === 'browser_loading') return;
 				notice =
 					error instanceof ApiError && error.status === 409
 						? 'O agente está no controle agora. Aguarde ele terminar.'
@@ -514,7 +523,29 @@
 			onpointerup={up}
 			onpointercancel={() => (pointer = null)}
 		>
-			{#if frame}
+			{#if loadError}
+				<div
+					class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
+					role="alert"
+				>
+					<span class="text-danger"><Icon name="alert" size={28} /></span>
+					<p class="leading-snug font-medium">{loadError}</p>
+					<button type="button" class="btn" onclick={retry}>
+						<Icon name="refresh" size={20} />
+						Tentar de novo
+					</button>
+					{#if fallbackUrl}
+						<a
+							href={fallbackUrl}
+							target="_blank"
+							rel="noopener noreferrer external"
+							class="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary-deep underline decoration-primary/40 underline-offset-4"
+						>
+							Abrir a vaga no site <Icon name="external" size={16} />
+						</a>
+					{/if}
+				</div>
+			{:else if frame}
 				<img
 					src={frame.src}
 					alt=""
@@ -569,7 +600,7 @@
 			{#each marks as mark (mark.id)}
 				<span class="mark" style="left: {mark.x}px; top: {mark.y}px" aria-hidden="true"></span>
 			{/each}
-			{#if frame && maxPan > 0}
+			{#if frame && maxPan > 0 && !loadError}
 				<!-- Há mais página do que cabe na janela: trilho à direita e aviso embaixo. -->
 				<span
 					class="thumb"
@@ -583,7 +614,7 @@
 					</span>
 				{/if}
 			{/if}
-			{#if opening}
+			{#if loading && !loadError}
 				<div
 					class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-paper/80 text-sm font-medium"
 					role="status"

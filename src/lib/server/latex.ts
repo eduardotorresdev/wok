@@ -294,7 +294,9 @@ function installProviderOf(file: string): Promise<string | null> {
 		if (!pkg) return null;
 		const installed = await run(tlmgr, ['install', pkg], os.tmpdir(), env, INSTALL_TIMEOUT_MS);
 		console.log(`[latex] tlmgr install ${pkg} for ${file}: exit ${installed.code}`);
-		return installed.code === 0 ? pkg : null;
+		// tlmgr can exit non-zero after the package is in place (a post-install step
+		// failing); the retry of the compile is what tells whether it worked.
+		return installed.missing ? null : pkg;
 	});
 	installLock.tail = job.catch(() => {});
 	return job;
@@ -432,9 +434,11 @@ export async function compileLatex(
 			const texRoot = path.dirname(path.dirname(path.dirname(await fs.realpath(engine))));
 			const compile = () => runSandboxed(engine, args, work, env, [texRoot]);
 			res = await compile();
+			const tried = new Set<string>();
 			for (let n = 0; n < MAX_INSTALLS && res.code !== 0; n++) {
 				const file = res.out.match(MISSING_FILE)?.[1];
-				if (!file || !(await installProviderOf(file))) break;
+				if (!file || tried.has(file) || !(await installProviderOf(file))) break;
+				tried.add(file);
 				res = await compile();
 			}
 		} else {

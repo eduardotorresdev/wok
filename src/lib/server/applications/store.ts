@@ -199,6 +199,14 @@ export function setStatus(
 	});
 }
 
+export function getApplicationForJob(userId: string, jobId: string) {
+	return db()
+		.select({ id: schema.application.id })
+		.from(schema.application)
+		.where(and(eq(schema.application.userId, userId), eq(schema.application.jobId, jobId)))
+		.get();
+}
+
 /** Returns the application for this job, creating it (queued) on the first apply swipe. */
 export function createApplication(
 	userId: string,

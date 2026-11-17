@@ -1,5 +1,7 @@
 import { and, count, eq, isNotNull, notExists, sql } from 'drizzle-orm';
+import { connectedAccounts } from '../browser/service.ts';
 import { db, schema } from '../db/index.ts';
+import { config } from '../env.ts';
 
 export interface JobDto {
 	id: string;
@@ -13,6 +15,9 @@ export interface JobDto {
 	applyUrl: string | null;
 	/** Where the application goes through: the company's site, or the job board's own flow. */
 	applyVia: 'company' | 'linkedin' | 'glassdoor';
+	/** False when applying needs an account that is not connected; see blockedBy. */
+	canApply: boolean;
+	blockedBy: 'linkedin' | 'glassdoor' | null;
 	salary: string | null;
 	postedAt: string | null;
 	summary: string | null;
@@ -24,7 +29,27 @@ export function applyVia(row: { source: 'linkedin' | 'glassdoor'; applyUrl: stri
 	return row.applyUrl ? 'company' : row.source;
 }
 
-export function jobDto(row: typeof schema.job.$inferSelect): JobDto {
+type Connected = { linkedin: boolean; glassdoor: boolean };
+
+/**
+ * The account an application to this job needs and the person has not
+ * connected. The company's own form needs none; Glassdoor in manual mode
+ * needs none either, since the person applies there by themselves.
+ */
+export function blockedBy(
+	row: { source: 'linkedin' | 'glassdoor'; applyUrl: string | null },
+	accounts: Connected
+): 'linkedin' | 'glassdoor' | null {
+	const via = applyVia(row);
+	if (via === 'linkedin') return accounts.linkedin ? null : 'linkedin';
+	if (via === 'glassdoor' && config.glassdoorApply === 'auto') {
+		return accounts.glassdoor ? null : 'glassdoor';
+	}
+	return null;
+}
+
+export function jobDto(row: typeof schema.job.$inferSelect, accounts?: Connected): JobDto {
+	const blocked = accounts ? blockedBy(row, accounts) : null;
 	return {
 		id: row.id,
 		title: row.title,
@@ -35,6 +60,8 @@ export function jobDto(row: typeof schema.job.$inferSelect): JobDto {
 		url: row.url,
 		applyUrl: row.applyUrl,
 		applyVia: applyVia(row),
+		canApply: !blocked,
+		blockedBy: blocked,
 		salary: row.salary,
 		postedAt: row.postedAt,
 		summary: row.summary,
@@ -68,7 +95,8 @@ function searching(userId: string) {
  * already-scored ones are returned, so a card never shows up without its score
  * and then jumps position; once it ends, anything left unscored goes last.
  */
-export function feed(userId: string, limit = 200): JobDto[] {
+export async function feed(userId: string, limit = 200): Promise<JobDto[]> {
+	const accounts = await connectedAccounts(userId);
 	const rows = db()
 		.select()
 		.from(schema.job)
@@ -84,7 +112,7 @@ export function feed(userId: string, limit = 200): JobDto[] {
 		)
 		.limit(limit)
 		.all();
-	return rows.map(jobDto);
+	return rows.map((row) => jobDto(row, accounts));
 }
 
 export function feedCount(userId: string) {

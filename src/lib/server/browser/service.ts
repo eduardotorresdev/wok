@@ -2,7 +2,9 @@ import dns from 'node:dns/promises';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import net from 'node:net';
+import Database from 'better-sqlite3';
 import { chromium, devices, type BrowserContext, type CDPSession, type Page } from 'playwright';
+import { config } from '../env.ts';
 import { ApiError } from '../http.ts';
 import { userDir } from '../latex.ts';
 
@@ -26,7 +28,13 @@ export interface BrowserState {
 	url: string | null;
 	title: string | null;
 	viewport: { width: number; height: number };
-	accounts: Accounts;
+	/** glassdoor is null when the WOK does not use that account (see glassdoorManual). */
+	accounts: { linkedin: boolean; glassdoor: boolean | null };
+	/**
+	 * Glassdoor refuses our browser at its human check, so there is no login to
+	 * offer: the person applies there by themselves.
+	 */
+	glassdoorManual: boolean;
 }
 
 export interface Frame {
@@ -151,11 +159,56 @@ function accountsFile(userId: string) {
 }
 
 function readAccounts(userId: string): Accounts {
+	let known: Accounts = { linkedin: false, glassdoor: false };
 	try {
-		return JSON.parse(fs.readFileSync(accountsFile(userId), 'utf8')) as Accounts;
+		known = JSON.parse(fs.readFileSync(accountsFile(userId), 'utf8')) as Accounts;
 	} catch {
-		return { linkedin: false, glassdoor: false };
+		// never detected yet
 	}
+	// The profile's cookie store says whether the LinkedIn login is still there
+	// (and not expired) without starting Chromium; the file is the fallback.
+	const linkedin = linkedinCookieOnDisk(userId);
+	return linkedin === null ? known : { ...known, linkedin };
+}
+
+/** Chromium stores cookie expiry as microseconds since 1601-01-01. */
+const CHROMIUM_EPOCH_OFFSET_S = 11_644_473_600;
+
+function linkedinCookieOnDisk(userId: string): boolean | null {
+	const file = userDir(userId, 'browser-profile', 'Default', 'Cookies');
+	if (!fs.existsSync(file)) return null;
+	try {
+		const cookies = new Database(file, { readonly: true, fileMustExist: true, timeout: 500 });
+		try {
+			const rows = cookies
+				.prepare(
+					"select expires_utc as expires, has_expires as hasExpires from cookies where name = 'li_at' and host_key like '%linkedin.com'"
+				)
+				.all() as { expires: number; hasExpires: number }[];
+			const now = Date.now() / 1000;
+			return rows.some((r) => !r.hasExpires || r.expires / 1e6 - CHROMIUM_EPOCH_OFFSET_S > now);
+		} finally {
+			cookies.close();
+		}
+	} catch {
+		// locked by a running Chromium, or a layout this code does not know
+		return null;
+	}
+}
+
+/** Accounts as the API shows them. */
+function shownAccounts(accounts: Accounts): Pick<BrowserState, 'accounts' | 'glassdoorManual'> {
+	const manual = config.glassdoorApply === 'manual';
+	return {
+		accounts: { linkedin: accounts.linkedin, glassdoor: manual ? null : accounts.glassdoor },
+		glassdoorManual: manual
+	};
+}
+
+/** Which accounts are connected right now: asked to the open browser, else read from disk. */
+export async function connectedAccounts(userId: string): Promise<Accounts> {
+	const session = sessions.get(userId);
+	return session ? detectAccounts(session) : readAccounts(userId);
 }
 
 /**
@@ -216,7 +269,7 @@ async function tabState(session: Session, tab: Tab): Promise<BrowserState> {
 		url: tab.page.url(),
 		title: await tab.page.title().catch(() => null),
 		viewport: VIEWPORT,
-		accounts: await detectAccounts(session)
+		...shownAccounts(await detectAccounts(session))
 	};
 }
 
@@ -228,7 +281,7 @@ function closedState(userId: string, applicationId?: string | null): BrowserStat
 		url: null,
 		title: null,
 		viewport: VIEWPORT,
-		accounts: readAccounts(userId)
+		...shownAccounts(readAccounts(userId))
 	};
 }
 
@@ -241,7 +294,7 @@ export async function getState(
 	const tab = resolveTab(session, applicationId);
 	if (!session || !tab) {
 		const closed = closedState(userId, applicationId);
-		if (session) closed.accounts = await detectAccounts(session);
+		if (session) Object.assign(closed, shownAccounts(await detectAccounts(session)));
 		return closed;
 	}
 	return tabState(session, tab);

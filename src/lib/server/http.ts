@@ -6,14 +6,21 @@ export class ApiError extends Error {
 	constructor(
 		public status: number,
 		public code: string,
-		message: string
+		message: string,
+		/** Extra fields for the error object, e.g. which provider blocked the action. */
+		public extra: Record<string, unknown> = {}
 	) {
 		super(message);
 	}
 }
 
-export function apiError(status: number, code: string, message: string) {
-	return json({ error: { code, message } }, { status });
+export function apiError(
+	status: number,
+	code: string,
+	message: string,
+	extra: Record<string, unknown> = {}
+) {
+	return json({ error: { ...extra, code, message } }, { status });
 }
 
 export function requireUser(event: RequestEvent) {
@@ -47,7 +54,7 @@ export function api<E extends RequestEvent>(handler: (event: E) => Promise<Respo
 		try {
 			return await handler(event);
 		} catch (err) {
-			if (err instanceof ApiError) return apiError(err.status, err.code, err.message);
+			if (err instanceof ApiError) return apiError(err.status, err.code, err.message, err.extra);
 			console.error(`[api] ${event.request.method} ${event.url.pathname}`, err);
 			return apiError(500, 'internal_error', 'Erro interno. Tente novamente.');
 		}

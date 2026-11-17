@@ -160,11 +160,18 @@ function save() {
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const STEPS: { after: number; status: ApplicationStatus; message: string }[] = [
+const STEPS: { after: number; status: ApplicationStatus; message: string; kind?: string }[] = [
 	{ after: 0, status: 'queued', message: 'Na fila do agente' },
 	{ after: 3, status: 'tailoring', message: 'Lendo a descrição da vaga' },
 	{ after: 6, status: 'tailoring', message: 'Adaptando o currículo para a vaga' },
 	{ after: 10, status: 'tailoring', message: 'Currículo adaptado compilado em 1 página' },
+	{
+		after: 11,
+		status: 'tailoring',
+		kind: 'tailor_note',
+		message:
+			'Atende: sistemas distribuídos, Kafka, liderança técnica. Lacuna: a vaga pede Clojure e seu currículo não cita. Mudei: resumo reescrito para plataforma e a migração do monolito subiu para o topo.'
+	},
 	{ after: 12, status: 'applying', message: 'Abrindo a página da vaga' },
 	{ after: 16, status: 'applying', message: 'Preenchendo o formulário de candidatura' }
 ];
@@ -174,7 +181,7 @@ function finalStep(index: number, job: Job) {
 		return {
 			after: 20,
 			status: 'needs_user' as const,
-			message: 'O LinkedIn pediu login. Entre pelo Browser para o agente continuar.'
+			message: 'O LinkedIn pediu login para continuar.'
 		};
 	}
 	if (index % 4 === 3) {
@@ -201,7 +208,7 @@ function toApplication(entry: Store['apps'][number], index: number): Application
 	const last = visible[visible.length - 1];
 	const steps: Step[] = visible.map((s, i) => ({
 		id: i + 1,
-		kind: s.status,
+		kind: ('kind' in s && s.kind) || 'status',
 		message: s.message,
 		data: null,
 		createdAt: new Date(entry.createdAt + s.after * 1000).toISOString()

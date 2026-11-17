@@ -8,6 +8,7 @@ import type {
 	Profile,
 	Resume,
 	SavedAnswer,
+	Step,
 	SwipeDirection
 } from './types.ts';
 
@@ -57,10 +58,14 @@ export const applicationQuery = (id: string, streaming = false) =>
 	queryOptions({
 		queryKey: keys.application(id),
 		queryFn: () => api.applications.get(id),
-		enabled: browser && !!id,
+		// Inscrição otimista ainda não existe no servidor.
+		enabled: browser && !!id && !id.startsWith('optimistic-'),
 		refetchInterval: (query) =>
 			!streaming && query.state.data && isLive(query.state.data) ? 2500 : false
 	});
+
+export const browserStateQuery = () =>
+	queryOptions({ queryKey: keys.browser, queryFn: api.browser.state, enabled: browser });
 
 export const profileQuery = () =>
 	queryOptions({
@@ -108,6 +113,14 @@ export const deleteAnswerMutation = (client: QueryClient) =>
 	});
 
 /** Grava uma inscrição nos dois caches (lista e detalhe), preservando os passos já vistos. */
+export function putStep(client: QueryClient, id: string, step: Step) {
+	client.setQueryData<Application>(keys.application(id), (old) =>
+		old && !old.steps?.some((s) => s.id === step.id)
+			? { ...old, steps: [...(old.steps ?? []), step].sort((a, b) => a.id - b.id) }
+			: old
+	);
+}
+
 export function putApplication(client: QueryClient, app: Application) {
 	client.setQueryData<Application[]>(keys.applications, (old) =>
 		old?.map((a) => (a.id === app.id ? { ...a, ...app, steps: undefined } : a))

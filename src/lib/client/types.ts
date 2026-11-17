@@ -149,13 +149,27 @@ export interface CompileResult {
 
 export interface BrowserState {
 	open: boolean;
+	/** Quem dirige o browser agora. */
+	controller: 'agent' | 'user' | 'idle';
+	applicationId: string | null;
 	url: string | null;
-	title?: string | null;
+	title: string | null;
+	viewport: { width: number; height: number };
+	accounts: { linkedin: boolean; glassdoor: boolean };
 }
 
+export interface BrowserFrame {
+	/** JPEG em base64. */
+	jpeg: string;
+	width: number;
+	height: number;
+}
+
+/** Coordenadas em pixels CSS do viewport remoto (state.viewport). */
 export type BrowserInput =
 	| { type: 'tap'; x: number; y: number }
-	| { type: 'scroll'; x: number; y: number; deltaX?: number; deltaY: number }
+	| { type: 'scroll'; deltaY: number; x?: number; y?: number }
 	| { type: 'type'; text: string }
 	| { type: 'key'; key: string }
-	| { type: 'back' };
+	| { type: 'back' }
+	| { type: 'reload' };

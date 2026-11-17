@@ -242,6 +242,8 @@ function run(s: Store): SearchRun {
 	};
 }
 
+let browserOpen = false;
+
 function forced() {
 	return new URLSearchParams(location.search).get('estado');
 }
@@ -296,10 +298,18 @@ export async function mock(method: string, path: string, body: unknown): Promise
 		save();
 		return applications().find((a) => a.id === entry.id);
 	}
-	if (route === 'GET /api/browser/state') return { open: false, url: null };
-	if (route === 'POST /api/browser/open') return { open: true, url: input.url };
-	if (route === 'POST /api/browser/input' || route === 'POST /api/browser/close') {
-		return { ok: true };
+	if (route.startsWith('GET /api/browser') || route.startsWith('POST /api/browser')) {
+		if (route === 'POST /api/browser/open') browserOpen = true;
+		if (route === 'POST /api/browser/close') browserOpen = false;
+		return {
+			open: browserOpen,
+			controller: browserOpen ? 'user' : 'idle',
+			applicationId: null,
+			url: browserOpen ? ((input.url as string) ?? 'https://www.linkedin.com/login') : null,
+			title: null,
+			viewport: { width: 412, height: 839 },
+			accounts: { linkedin: false, glassdoor: false }
+		};
 	}
 
 	throw new ApiError(404, 'mock_missing', `Sem fixture para ${route}`);

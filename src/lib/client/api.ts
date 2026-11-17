@@ -27,6 +27,28 @@ export class ApiError extends Error {
 const NOT_BUILT_YET = new Set([404, 405, 501]);
 
 /** Em dev, `?mock` na URL força as fixtures mesmo com a rota real no ar. */
+let leaving = false;
+
+/**
+ * Um 401 só manda para o login depois de confirmar que a sessão acabou mesmo:
+ * uma resposta isolada (deploy no meio, cookie ainda chegando) não derruba quem está logado.
+ */
+async function sessionLost() {
+	if (leaving) return;
+	leaving = true;
+	try {
+		const res = await fetch('/api/auth/get-session', { credentials: 'same-origin' });
+		const session = res.ok ? await res.json().catch(() => null) : undefined;
+		if (session !== null) return; // sessão válida, ou não deu para saber
+		const here = location.pathname + location.search;
+		location.assign(here === '/' ? '/login' : `/login?next=${encodeURIComponent(here)}`);
+	} catch {
+		// sem rede: fica onde está
+	} finally {
+		leaving = false;
+	}
+}
+
 function forcedMock() {
 	return browser && new URLSearchParams(location.search).has('mock');
 }
@@ -62,9 +84,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 		return mock(method, path, body) as Promise<T>;
 	}
 
-	if (res.status === 401 && typeof location !== 'undefined') {
-		location.assign('/login');
-	}
+	if (res.status === 401 && typeof location !== 'undefined') void sessionLost();
 	throw new ApiError(
 		res.status,
 		known?.code ?? 'http_error',
@@ -131,8 +151,9 @@ export const api = {
 	},
 	browser: {
 		state: () => call<BrowserState>('GET', '/api/browser/state'),
-		open: (url: string) => call<BrowserState>('POST', '/api/browser/open', { url }),
+		/** Com url: abre e dá o controle ao usuário. Sem url: assume o controle da página atual. */
+		open: (url?: string) => call<BrowserState>('POST', '/api/browser/open', url ? { url } : {}),
 		input: (input: BrowserInput) => call<unknown>('POST', '/api/browser/input', input),
-		close: () => call<unknown>('POST', '/api/browser/close', {})
+		close: () => call<BrowserState>('POST', '/api/browser/close', {})
 	}
 };

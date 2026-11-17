@@ -1,4 +1,4 @@
-import type { Job } from './types.ts';
+import type { ApplicationStatus, Job } from './types.ts';
 
 const rtf = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' });
 
@@ -23,4 +23,20 @@ export const sourceLabel = (source: Job['source']) =>
 export function scorePercent(score: number | null | undefined) {
 	if (score == null || Number.isNaN(score)) return null;
 	return Math.round(Math.max(0, Math.min(100, score <= 1 ? score * 100 : score)));
+}
+
+export const STATUS_LABEL: Record<ApplicationStatus, string> = {
+	queued: 'Na fila',
+	tailoring: 'Ajustando currículo',
+	applying: 'Inscrevendo',
+	needs_user: 'Precisa de você',
+	submitted: 'Enviada',
+	failed: 'Falhou'
+};
+
+export function clockTime(iso: string) {
+	const date = new Date(iso);
+	return Number.isNaN(date.getTime())
+		? ''
+		: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }

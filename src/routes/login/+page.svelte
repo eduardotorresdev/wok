@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/state';
+	import { untrack } from 'svelte';
 	import { authClient } from '#lib/client/auth.ts';
 	import Brush from '#lib/components/Brush.svelte';
 	import Icon from '#lib/components/Icon.svelte';
@@ -11,10 +11,10 @@
 	let error = $state<string | null>(null);
 	let cooldown = $state(0);
 
-	const next = $derived.by(() => {
-		const target = page.url.searchParams.get('next');
-		return target && target.startsWith('/') && !target.startsWith('//') ? target : '/';
-	});
+	let { data } = $props();
+	const next = $derived(data.next);
+	// O aviso do link some quando a pessoa pede um novo.
+	let linkError = $state(untrack(() => data.linkError));
 
 	$effect(() => {
 		if (cooldown <= 0) return;
@@ -26,7 +26,12 @@
 		sending = true;
 		error = null;
 		try {
-			const result = await authClient.signIn.magicLink({ email: address, callbackURL: next });
+			const result = await authClient.signIn.magicLink({
+				email: address,
+				callbackURL: next,
+				// Link usado ou vencido volta para o login com o motivo, não para uma página protegida.
+				errorCallbackURL: next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`
+			});
 			if (result.error) {
 				error =
 					result.error.status === 429
@@ -35,6 +40,7 @@
 				return;
 			}
 			sentTo = address;
+			linkError = null;
 			cooldown = 30;
 		} catch {
 			error = 'Sem conexão. Tente de novo.';
@@ -114,10 +120,26 @@
 		</section>
 	{:else}
 		<section class="mt-9">
-			<h1 class="t-display text-balance">Seu currículo, na vaga <Underline>certa</Underline></h1>
-			<p class="mt-4 text-base leading-relaxed text-ink-soft">
-				O Wok lê seu currículo em LaTeX, encontra vagas e se inscreve por você.
-			</p>
+			{#if linkError}
+				<h1 class="t-display text-balance">
+					{linkError === 'failed' ? 'Não deu para entrar' : 'Esse link não vale mais'}
+				</h1>
+				<p class="mt-4 rounded-sm bg-danger-tint p-3 text-base leading-relaxed" role="alert">
+					{#if linkError === 'expired'}
+						O link de acesso venceu: ele vale por 15 minutos.
+					{:else if linkError === 'used'}
+						O link de acesso já foi usado ou venceu. Cada link abre uma vez só.
+					{:else}
+						Algo falhou ao abrir o link de acesso.
+					{/if}
+					Digite seu email e mandamos um novo.
+				</p>
+			{:else}
+				<h1 class="t-display text-balance">Seu currículo, na vaga <Underline>certa</Underline></h1>
+				<p class="mt-4 text-base leading-relaxed text-ink-soft">
+					O Wok lê seu currículo em LaTeX, encontra vagas e se inscreve por você.
+				</p>
+			{/if}
 
 			<form class="mt-7" onsubmit={submit} novalidate>
 				<label for="email" class="t-label">Seu email</label>

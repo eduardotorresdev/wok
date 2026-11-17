@@ -109,6 +109,23 @@ until "$HERE/inflight.sh"; do
 	sleep 15; waited=$((waited + 15))
 done
 
+# Alguém usando o browser remoto (ex.: login do LinkedIn em "Conectar contas") seria
+# expulso pelo restart. Espera 2 min de inatividade por até WOK_WAIT_BROWSER s (padrão 300)
+# e então segue mesmo assim, deixando o aviso no log.
+echo "==> browser remoto em uso"
+waited=0
+BROWSER_INTERRUPTED=0
+while n="$("$HERE/browser-active.sh")"; [ "${n:-0}" -gt 0 ]; do
+	echo "   $n sessão(ões) com atividade nos últimos 120 s"
+	if [ "${WOK_FORCE:-0}" = "1" ] || [ "$waited" -ge "${WOK_WAIT_BROWSER:-300}" ]; then
+		echo "!! AVISO: reiniciando com $n sessão(ões) de browser ativa(s) após ${waited}s de espera"
+		BROWSER_INTERRUPTED="$n"
+		break
+	fi
+	sleep 15; waited=$((waited + 15))
+done
+[ "$BROWSER_INTERRUPTED" = "0" ] && echo "   nenhuma sessão ativa"
+
 echo "==> backup"
 "$HERE/backup.sh" || echo "aviso: backup falhou"
 

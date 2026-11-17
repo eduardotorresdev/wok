@@ -25,7 +25,17 @@
 	const feed = createQuery(() => feedQuery(collecting));
 	const swipe = createMutation(() => swipeMutation(client));
 
-	const jobs = $derived(feed.data ?? []);
+	// Durante a busca só entram vagas já avaliadas: card sem nota nem resumo não ajuda a decidir.
+	const fresh = $derived((feed.data ?? []).filter((job) => !collecting || job.matchScore !== null));
+	// A ordem do servidor muda conforme as notas chegam; o card que a pessoa
+	// está vendo fica no topo até ela decidir.
+	let topId: string | null = null;
+	const jobs = $derived.by(() => {
+		const top = fresh.find((job) => job.id === topId);
+		const list = top ? [top, ...fresh.filter((job) => job !== top)] : fresh;
+		topId = list[0]?.id ?? null;
+		return list;
+	});
 
 	// Quando a coleta termina, o feed é relido uma última vez.
 	let wasCollecting = false;
@@ -149,7 +159,11 @@
 						<p class="sr-only">Carregando vagas</p>
 					{:else if phase === 'collecting'}
 						<div class="ink-dots" aria-hidden="true"><span></span><span></span><span></span></div>
-						<h2 class="t-headline mt-5 text-balance">Coletando vagas para você</h2>
+						<h2 class="t-headline mt-5 text-balance">
+							{(feed.data?.length ?? 0) > 0
+								? 'Avaliando as vagas encontradas'
+								: 'Coletando vagas para você'}
+						</h2>
 						<p class="mt-3 text-[0.9375rem] leading-relaxed text-ink-soft">
 							O agente está lendo o LinkedIn e o Glassdoor com seus termos de busca. Costuma levar
 							cerca de um minuto; pode deixar esta tela aberta.

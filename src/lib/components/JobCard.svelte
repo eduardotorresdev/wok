@@ -92,7 +92,7 @@
 			<div class="mt-auto pt-3">
 				{#if job.matchReasons.length}
 					<ul class="space-y-1.5 border-t border-line pt-3">
-						{#each job.matchReasons.slice(0, 2) as reason (reason)}
+						{#each job.matchReasons.slice(0, job.summary ? 3 : 4) as reason (reason)}
 							<li class="flex gap-2 text-sm leading-snug">
 								{@render tick(16)}
 								<span class="line-clamp-2">{reason}</span>

@@ -30,6 +30,8 @@ export async function structured<T extends z.ZodType>(opts: {
 	 * cached system block so only the first call of a series pays for it.
 	 */
 	context?: string | null;
+	/** Small, mechanical tasks answer faster with 'low'; default is the project's effort. */
+	effort?: 'low' | 'medium' | 'high';
 }): Promise<z.infer<T>> {
 	const response = await anthropic().messages.parse({
 		model: MODEL,
@@ -41,7 +43,7 @@ export async function structured<T extends z.ZodType>(opts: {
 				]
 			: opts.system,
 		messages: [{ role: 'user', content: opts.user }],
-		output_config: { effort: EFFORT, format: zodOutputFormat(opts.schema) }
+		output_config: { effort: opts.effort ?? EFFORT, format: zodOutputFormat(opts.schema) }
 	});
 	if (response.stop_reason === 'refusal') {
 		throw new LlmRefusal(response.stop_details?.explanation ?? 'O modelo recusou o pedido.');

@@ -34,6 +34,18 @@ describe('appendToSection', () => {
 		expect(out).toBe('## Experiência\n\n- Fato um\n\n## O que não afirmar\n\n- Não uso GraphQL\n');
 	});
 
+	it('adds a fact inside the block of the job it belongs to', () => {
+		const jobs =
+			'## Experiência\n\n### Sênior — Globo (2021--atual)\n- A\n\n### Engenheira — Nubank (2017--2021)\n- B\n\n## Formação\n\n- USP\n';
+		expect(appendToSection(jobs, 'Experiência', '- Novo', 'Sênior — Globo (2021--atual)')).toBe(
+			'## Experiência\n\n### Sênior — Globo (2021--atual)\n- A\n- Novo\n\n### Engenheira — Nubank (2017--2021)\n- B\n\n## Formação\n\n- USP\n'
+		);
+		// A job that has no block falls back to the end of the section.
+		expect(appendToSection(jobs, 'Experiência', '- Novo', 'Estágio — Outra')).toBe(
+			'## Experiência\n\n### Sênior — Globo (2021--atual)\n- A\n\n### Engenheira — Nubank (2017--2021)\n- B\n- Novo\n\n## Formação\n\n- USP\n'
+		);
+	});
+
 	it('puts text right under a heading that has no content yet', () => {
 		expect(appendToSection('## Formação\n\n## Experiência\n\n- x\n', 'Formação', '- Curso')).toBe(
 			'## Formação\n\n- Curso\n\n## Experiência\n\n- x\n'

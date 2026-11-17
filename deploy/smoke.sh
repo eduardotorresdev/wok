@@ -73,6 +73,7 @@ for r in onboarding curriculo ajustes; do
 	check "local /$r sem sessão -> 303 /login"       redirects_to_login "$LOCAL/$r"
 done
 check "local /login 200"                          http_is "$LOCAL/login" 200
+check "local /login?error=INVALID_TOKEN 200"      http_is "$LOCAL/login?error=INVALID_TOKEN" 200
 check "local /api/auth respondendo (/api/auth/ok)" http_is "$LOCAL/api/auth/ok" 200
 check "magic link real via Resend -> $EMAIL"      magic_link
 check "local /api/jobs/feed sem sessão -> 401 JSON"    unauthorized_json "$LOCAL/api/jobs/feed"
@@ -84,6 +85,7 @@ for r in onboarding curriculo ajustes; do
 	check "HTTPS /$r sem sessão -> 303 /login"       redirects_to_login "$BASE/$r"
 done
 check "HTTPS $BASE/login 200"                     http_is "$BASE/login" 200
+check "HTTPS /login?error=INVALID_TOKEN 200"      http_is "$BASE/login?error=INVALID_TOKEN" 200
 check "HTTPS $BASE/api/health 200"                http_is "$BASE/api/health" 200
 check "HTTPS $BASE/api/auth/ok 200"               http_is "$BASE/api/auth/ok" 200
 check "HTTPS /api/jobs/feed sem sessão -> 401 JSON"    unauthorized_json "$BASE/api/jobs/feed"
